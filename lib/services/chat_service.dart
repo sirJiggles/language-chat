@@ -67,13 +67,51 @@ class ChatService extends ChangeNotifier {
         
         // Update context with conversation data if context manager is initialized
         if (_contextManager.isInitialized) {
-          // Update student profile with this conversation
+          // Ask the AI to assess the language level based on this conversation
+          final assessmentPrompt = 'Based on the user\'s message: "$message", assess their proficiency level in $_targetLanguage according to CEFR standards (A1-C2). Consider vocabulary range, grammatical accuracy, fluency, and complexity. Respond with only the level designation (A1, A2, B1, B2, C1, or C2).';
+          
+          String assessedLevel = 'A1'; // Default level
+          try {
+            // Make a separate API call just for assessment
+            final assessmentResponse = await http.post(
+              uri,
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'model': _ollamaModel,
+                'messages': [
+                  {
+                    'role': 'system',
+                    'content': 'You are a language assessment expert. Respond only with the CEFR level (A1, A2, B1, B2, C1, or C2).'
+                  },
+                  {'role': 'user', 'content': assessmentPrompt},
+                ],
+                'stream': false,
+                'options': {'temperature': 0.3}, // Lower temperature for more consistent assessment
+              }),
+            );
+            
+            if (assessmentResponse.statusCode == 200) {
+              final assessmentData = jsonDecode(assessmentResponse.body);
+              final aiAssessment = assessmentData['message']?['content'] ?? '';
+              // Extract just the level code (A1, A2, etc.)
+              final levelMatch = RegExp(r'(A1|A2|B1|B2|C1|C2)').firstMatch(aiAssessment);
+              if (levelMatch != null) {
+                assessedLevel = levelMatch.group(0)!;
+                debugPrint('AI assessed language level: $assessedLevel');
+              }
+            }
+          } catch (e) {
+            debugPrint('Error during language assessment: $e');
+          }
+          
+          // Update student profile with this conversation and the AI-assessed level
           await _contextManager.updateProfileWithSession(
             conversation: 'User: $message\nAssistant: $assistantMessage',
+            assessedLevel: assessedLevel,
           );
           
           // Save conversation summary for debugging
-          final summary = 'Language: $_targetLanguage\nUser level: ${_contextManager.studentProfile?.proficiencyLevel ?? "Unknown"}\n\nUser asked about: $message';
+          final summary = 'Language: $_targetLanguage\nUser level: $assessedLevel\n\nUser asked about: $message';
           await _contextManager.saveConversationSummary(
             'User: $message\nAssistant: $assistantMessage', 
             summary

@@ -205,6 +205,7 @@ class ContextManager extends ChangeNotifier {
   Future<void> updateProfileWithSession({
     required String conversation,
     String? topic,
+    String? assessedLevel,
   }) async {
     if (_studentProfile == null) return;
     
@@ -212,8 +213,9 @@ class ContextManager extends ChangeNotifier {
     final newVocabulary = _levelAssessment.extractVocabulary(conversation);
     final newGrammarPoints = _levelAssessment.extractGrammarPoints(conversation);
     
-    // Assess language level
-    final assessedLevel = _levelAssessment.assessLevel(conversation);
+    // Use provided assessment if available, otherwise use our algorithm
+    final level = assessedLevel ?? _levelAssessment.assessLevel(conversation);
+    debugPrint('Using language level: $level (AI provided: ${assessedLevel != null})');
     
     // Update profile
     _studentProfile!.updateWithSession(
@@ -225,10 +227,11 @@ class ContextManager extends ChangeNotifier {
     
     // Update proficiency level if assessment is higher than current level
     final currentLevelIndex = _getLevelIndex(_studentProfile!.proficiencyLevel);
-    final assessedLevelIndex = _getLevelIndex(assessedLevel);
+    final assessedLevelIndex = _getLevelIndex(level);
     
     if (assessedLevelIndex > currentLevelIndex) {
-      _studentProfile!.updateProficiencyLevel(assessedLevel);
+      _studentProfile!.updateProficiencyLevel(level);
+      debugPrint('Updated proficiency level to: $level');
     }
     
     await saveStudentProfile();
