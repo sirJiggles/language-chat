@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'context_manager.dart';
 
 class ChatService extends ChangeNotifier {
   // Ollama configuration via environment
@@ -13,8 +14,13 @@ class ChatService extends ChangeNotifier {
     defaultValue: 'deepseek-r1:8b',
   );
   String _targetLanguage;
+  final ContextManager _contextManager;
 
-  ChatService({String targetLanguage = 'Spanish'}) : _targetLanguage = targetLanguage;
+  ChatService({
+    String targetLanguage = 'Spanish',
+    required ContextManager contextManager,
+  }) : _targetLanguage = targetLanguage,
+       _contextManager = contextManager;
 
   String _conversation = '';
   String _lastResponse = '';
@@ -58,6 +64,22 @@ class ChatService extends ChangeNotifier {
         assistantMessage = _stripThinkTags(assistantMessage).trim();
         _lastResponse = assistantMessage;
         _conversation += 'Assistant: $assistantMessage\n';
+        
+        // Update context with conversation data if context manager is initialized
+        if (_contextManager.isInitialized) {
+          // Update student profile with this conversation
+          await _contextManager.updateProfileWithSession(
+            conversation: 'User: $message\nAssistant: $assistantMessage',
+          );
+          
+          // Save conversation summary for debugging
+          final summary = 'Language: $_targetLanguage\nUser level: ${_contextManager.studentProfile?.proficiencyLevel ?? "Unknown"}\n\nUser asked about: $message';
+          await _contextManager.saveConversationSummary(
+            'User: $message\nAssistant: $assistantMessage', 
+            summary
+          );
+        }
+        
         _isThinking = false;
         notifyListeners();
         return assistantMessage;
@@ -81,6 +103,13 @@ class ChatService extends ChangeNotifier {
 
   void setTargetLanguage(String lang) {
     _targetLanguage = lang;
+    
+    // Update student profile if available and context manager is initialized
+    if (_contextManager.isInitialized && _contextManager.studentProfile != null) {
+      _contextManager.studentProfile!.targetLanguage = lang;
+      _contextManager.saveStudentProfile();
+    }
+    
     notifyListeners();
   }
 

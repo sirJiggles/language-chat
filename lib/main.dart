@@ -5,17 +5,29 @@ import 'screens/chat_screen.dart';
 import 'services/chat_service.dart';
 import 'services/speech_service.dart';
 import 'services/tts_service.dart';
+import 'services/context_manager.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize context manager first
+  final contextManager = ContextManager();
+  await contextManager.initialize();
+  
   runApp(
     MultiProvider(
       providers: [
+        // Provide context manager
+        ChangeNotifierProvider.value(value: contextManager),
+        
+        // Other services
         ChangeNotifierProvider(
           create: (_) => ChatService(
             targetLanguage: const String.fromEnvironment(
               'TARGET_LANGUAGE',
               defaultValue: 'Spanish',
             ),
+            contextManager: contextManager,
           ),
         ),
         ChangeNotifierProvider(create: (_) => SpeechService()),

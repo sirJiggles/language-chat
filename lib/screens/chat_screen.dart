@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
+import '../debug/debug_menu.dart';
 import 'settings_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -305,6 +306,22 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                 size: 26,
               ),
               tooltip: 'Settings',
+            ),
+          ),
+          // Debug menu button
+          Positioned(
+            bottom: 16,
+            right: 0,
+            child: IconButton(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DebugMenu()));
+              },
+              icon: Icon(
+                Icons.bug_report,
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                size: 26,
+              ),
+              tooltip: 'Debug Menu',
             ),
           ),
         ],
