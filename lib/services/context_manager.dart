@@ -203,23 +203,31 @@ class ContextManager extends ChangeNotifier {
       nativeLanguage: nativeLanguage,
       interests: interests,
     );
-    
     await saveStudentProfile();
     notifyListeners();
   }
   
-  // Update student profile with session data
+  // Update student profile with a new conversation session
+  // This is now non-blocking to allow the main conversation to continue
   Future<void> updateProfileWithSession({
     required String conversation,
-    String? topic,
     String? assessedLevel,
     List<String>? discoveredInterests,
   }) async {
+    // Return early if no profile exists
     if (_studentProfile == null) return;
     
     try {
-      // Update conversation history
-      _studentProfile!.conversationHistory.add(conversation);
+      // Make sure we have a mutable conversation history
+      try {
+        // Try to add to the existing list
+        _studentProfile!.conversationHistory.add(conversation);
+      } catch (e) {
+        // If that fails, create a new mutable list
+        debugPrint('Creating mutable conversation history');
+        _studentProfile!.conversationHistory = List<String>.from(_studentProfile!.conversationHistory);
+        _studentProfile!.conversationHistory.add(conversation);
+      }
       
       // Keep only the most recent conversations (limit to 10)
       if (_studentProfile!.conversationHistory.length > 10) {
@@ -241,11 +249,25 @@ class ContextManager extends ChangeNotifier {
       
       // Update interests if provided
       if (discoveredInterests != null && discoveredInterests.isNotEmpty) {
-        // Add new interests without duplicates
-        for (final interest in discoveredInterests) {
-          if (!_studentProfile!.interests.contains(interest)) {
-            _studentProfile!.interests.add(interest);
-            debugPrint('Added interest: $interest');
+        try {
+          // Try to add to the existing list
+          for (final interest in discoveredInterests) {
+            if (!_studentProfile!.interests.contains(interest)) {
+              _studentProfile!.interests.add(interest);
+              debugPrint('Added interest: $interest');
+            }
+          }
+        } catch (e) {
+          // If that fails, create a new mutable list
+          debugPrint('Creating mutable interests list');
+          _studentProfile!.interests = List<String>.from(_studentProfile!.interests);
+          
+          // Try again with the mutable list
+          for (final interest in discoveredInterests) {
+            if (!_studentProfile!.interests.contains(interest)) {
+              _studentProfile!.interests.add(interest);
+              debugPrint('Added interest: $interest');
+            }
           }
         }
       }

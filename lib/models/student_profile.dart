@@ -19,14 +19,20 @@ class StudentProfile {
     required this.targetLanguage,
     this.nativeLanguage = 'English',
     this.proficiencyLevel = 'A1',
-    this.interests = const [],
-    this.vocabularyProgress = const {},
-    this.grammarProgress = const {},
-    this.recentTopics = const [],
+    List<String>? interests,
+    Map<String, bool>? vocabularyProgress,
+    Map<String, bool>? grammarProgress,
+    List<String>? recentTopics,
     DateTime? lastInteraction,
     this.sessionCount = 0,
-    this.conversationHistory = const [],
-  }) : lastInteraction = lastInteraction ?? DateTime.now();
+    List<String>? conversationHistory,
+  }) : lastInteraction = lastInteraction ?? DateTime.now(),
+       // Create mutable copies of all collections
+       interests = interests != null ? List<String>.from(interests) : <String>[],
+       vocabularyProgress = vocabularyProgress != null ? Map<String, bool>.from(vocabularyProgress) : <String, bool>{},
+       grammarProgress = grammarProgress != null ? Map<String, bool>.from(grammarProgress) : <String, bool>{},
+       recentTopics = recentTopics != null ? List<String>.from(recentTopics) : <String>[],
+       conversationHistory = conversationHistory != null ? List<String>.from(conversationHistory) : <String>[];
 
   // Create a profile from JSON
   factory StudentProfile.fromJson(Map<String, dynamic> json) {
