@@ -15,11 +15,13 @@ class ContextManager extends ChangeNotifier {
   StudentProfile? _studentProfile;
   final Map<String, String> _contextFiles = {};
   bool _isInitialized = false;
+  bool _isInitialAssessment = false; // Flag to indicate if we're in initial assessment mode
   
   // Getters
   StudentProfile? get studentProfile => _studentProfile;
   bool get isInitialized => _isInitialized;
   Map<String, String> get contextFiles => _contextFiles;
+  bool get isInitialAssessment => _isInitialAssessment;
   
   // Initialize the context manager
   Future<void> initialize() async {
@@ -79,6 +81,7 @@ class ContextManager extends ChangeNotifier {
       'level_assessment.md',
       'conversation_strategies.md',
       'error_correction.md',
+      'initial_assessment.md',
     ];
     
     // Import flutter/services.dart at the top of the file
@@ -143,44 +146,48 @@ class ContextManager extends ChangeNotifier {
         final json = jsonDecode(content);
         _studentProfile = StudentProfile.fromJson(json);
         debugPrint('Student profile loaded successfully: ${_studentProfile!.targetLanguage} (${_studentProfile!.proficiencyLevel})');
+        _isInitialAssessment = false; // Not in assessment mode since we have a profile
       } else {
-        debugPrint('No existing student profile found, creating default profile');
-        // Create a default profile
-        await createStudentProfile(
-          targetLanguage: 'Spanish', // Default language
-          nativeLanguage: 'English',
-          name: 'Student',
-          interests: ['language learning', 'conversation'],
-        );
-        debugPrint('Created default student profile');
+        debugPrint('No existing student profile found, entering initial assessment mode');
+        // Don't create a profile yet - we'll create it after the first conversation
+        // Just set the initial assessment flag to true
+        _isInitialAssessment = true;
+        debugPrint('Entering initial assessment mode');
       }
     } catch (e) {
       debugPrint('Error loading student profile: $e');
     }
   }
   
-  // Save student profile
+  // Save student profile - non-blocking version
   Future<void> saveStudentProfile() async {
     if (_studentProfile == null) return;
     
-    try {
-      final baseDir = await _getContextDirectory();
-      final contextDir = Directory('${baseDir.path}/context');
-      
-      if (!await contextDir.exists()) {
-        await contextDir.create(recursive: true);
-        debugPrint('Created context directory for saving profile');
+    // Run in a separate async task to avoid blocking
+    Future<void> saveTask() async {
+      try {
+        final baseDir = await _getContextDirectory();
+        final profileFile = File('${baseDir.path}/context/student_profile.json');
+        
+        debugPrint('Saving student profile to: ${profileFile.path}');
+        
+        // Create directory if it doesn't exist
+        final directory = Directory(baseDir.path + '/context');
+        if (!await directory.exists()) {
+          await directory.create(recursive: true);
+        }
+        
+        // Convert profile to JSON and save
+        final json = jsonEncode(_studentProfile);
+        await profileFile.writeAsString(json);
+        debugPrint('Student profile saved successfully');
+      } catch (e) {
+        debugPrint('Error saving student profile: $e');
       }
-      
-      final profileFile = File('${baseDir.path}/context/student_profile.json');
-      debugPrint('Saving student profile to: ${profileFile.path}');
-      
-      final jsonData = _studentProfile!.toJson();
-      await profileFile.writeAsString(jsonEncode(jsonData));
-      debugPrint('Student profile saved successfully');
-    } catch (e) {
-      debugPrint('Error saving student profile: $e');
     }
+    
+    // Start the save task without awaiting it
+    saveTask();
   }
   
   // Create a new student profile
@@ -206,32 +213,61 @@ class ContextManager extends ChangeNotifier {
     required String conversation,
     String? topic,
     String? assessedLevel,
+    List<String>? discoveredInterests,
   }) async {
     if (_studentProfile == null) return;
     
-    // Extract vocabulary and grammar points
-    final newVocabulary = _levelAssessment.extractVocabulary(conversation);
-    final newGrammarPoints = _levelAssessment.extractGrammarPoints(conversation);
+    try {
+      // Update conversation history
+      _studentProfile!.conversationHistory.add(conversation);
+      
+      // Keep only the most recent conversations (limit to 10)
+      if (_studentProfile!.conversationHistory.length > 10) {
+        _studentProfile!.conversationHistory.removeAt(0);
+      }
+      
+      // Update level if provided and it's higher than current level
+      if (assessedLevel != null && assessedLevel.isNotEmpty) {
+        final currentLevelIndex = _getLevelIndex(_studentProfile!.proficiencyLevel);
+        final newLevelIndex = _getLevelIndex(assessedLevel);
+        
+        // If new level is valid and higher than current level (or current level is empty)
+        if (newLevelIndex >= 0 && 
+            (currentLevelIndex < 0 || newLevelIndex > currentLevelIndex)) {
+          _studentProfile!.proficiencyLevel = assessedLevel;
+          debugPrint('Updated proficiency level to: $assessedLevel');
+        }
+      }
+      
+      // Update interests if provided
+      if (discoveredInterests != null && discoveredInterests.isNotEmpty) {
+        // Add new interests without duplicates
+        for (final interest in discoveredInterests) {
+          if (!_studentProfile!.interests.contains(interest)) {
+            _studentProfile!.interests.add(interest);
+            debugPrint('Added interest: $interest');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating profile with session: $e');
+      // Continue despite errors to avoid blocking the main conversation
+    }
     
-    // Use provided assessment if available, otherwise use our algorithm
-    final level = assessedLevel ?? _levelAssessment.assessLevel(conversation);
-    debugPrint('Using language level: $level (AI provided: ${assessedLevel != null})');
-    
-    // Update profile
-    _studentProfile!.updateWithSession(
-      conversation: conversation,
-      newVocabulary: newVocabulary,
-      newGrammarPoints: newGrammarPoints,
-      topic: topic,
-    );
-    
-    // Update proficiency level if assessment is higher than current level
-    final currentLevelIndex = _getLevelIndex(_studentProfile!.proficiencyLevel);
-    final assessedLevelIndex = _getLevelIndex(level);
-    
-    if (assessedLevelIndex > currentLevelIndex) {
-      _studentProfile!.updateProficiencyLevel(level);
-      debugPrint('Updated proficiency level to: $level');
+    // If we're in initial assessment mode and we have a level and interests, complete the assessment
+    if (_isInitialAssessment && _studentProfile != null) {
+      // Check if we have enough information to complete the assessment
+      bool hasLevel = _studentProfile!.proficiencyLevel.isNotEmpty;
+      bool hasInterests = _studentProfile!.interests.isNotEmpty;
+      
+      debugPrint('Assessment check - hasLevel: $hasLevel, hasInterests: $hasInterests');
+      
+      if (hasLevel && hasInterests && _studentProfile!.interests.length >= 1) {
+        _completeInitialAssessment();
+      } else if (hasLevel && discoveredInterests != null && discoveredInterests.isNotEmpty) {
+        // If we have discovered interests in this update, complete the assessment
+        _completeInitialAssessment();
+      }
     }
     
     await saveStudentProfile();
@@ -304,10 +340,43 @@ $conversation
     return commonTopics.where((topic) => lowerConversation.contains(topic)).toList();
   }
   
+  // Complete the initial assessment
+  void _completeInitialAssessment() {
+    _isInitialAssessment = false;
+    debugPrint('Initial assessment completed');
+    debugPrint('Final profile - Level: ${_studentProfile!.proficiencyLevel}, Interests: ${_studentProfile!.interests.join(', ')}');
+    notifyListeners();
+  }
+  
   // Build system prompt for the AI based on context and profile
   String buildSystemPrompt() {
+    // If we don't have a student profile yet
     if (_studentProfile == null) {
       return 'You are a helpful language learning assistant. Keep responses concise and clear.';
+    }
+    
+    // If we're in initial assessment mode, use the initial assessment prompt
+    if (_isInitialAssessment) {
+      final initialAssessmentContent = _contextFiles['initial_assessment.md'] ?? '';
+      final targetLanguage = _studentProfile!.targetLanguage;
+      
+      return '''
+      You are a ${targetLanguage} language teacher conducting an initial assessment conversation with a new student.
+      
+      Your goal is to:
+      1. Assess the student's proficiency level in ${targetLanguage} through natural conversation
+      2. Discover their interests and learning goals
+      3. Make them feel comfortable and build rapport
+      
+      Start with simple greetings and gradually increase complexity to determine their level.
+      Ask about their interests, hobbies, and why they're learning ${targetLanguage}.
+      
+      Assessment Guide:
+      $initialAssessmentContent
+      
+      Keep your responses in ${targetLanguage} appropriate to their level, with occasional English explanations if needed.
+      Be encouraging and supportive throughout the conversation.
+      ''';
     }
     
     final level = _studentProfile!.proficiencyLevel;

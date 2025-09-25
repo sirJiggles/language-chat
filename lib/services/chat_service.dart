@@ -25,6 +25,10 @@ class ChatService extends ChangeNotifier {
   String _conversation = '';
   String _lastResponse = '';
   bool _isThinking = false;
+  
+  // Queue to store pending messages for assessment
+  final List<Map<String, String>> _pendingAssessments = [];
+  bool _isAssessing = false;
 
   String get conversation => _conversation;
   String get lastResponse => _lastResponse;
@@ -39,6 +43,12 @@ class ChatService extends ChangeNotifier {
       _isThinking = true;
       notifyListeners();
       final uri = Uri.parse('$_ollamaBaseUrl/api/chat');
+      
+      // Get system prompt from context manager
+      String systemPrompt = _contextManager.isInitialized
+          ? _contextManager.buildSystemPrompt()
+          : 'You are a helpful language learning assistant. Speak primarily in $_targetLanguage. Keep replies concise (max 2 sentences). If the user makes mistakes, gently correct and provide a short example. Translate to English only when explicitly asked.';
+      
       final response = await http.post(
         uri,
         headers: const {'Content-Type': 'application/json'},
@@ -47,8 +57,7 @@ class ChatService extends ChangeNotifier {
           'messages': [
             {
               'role': 'system',
-              'content':
-                  'You are a helpful language learning assistant. Speak primarily in $targetLanguage. Keep replies concise (max 2 sentences). If the user makes mistakes, gently correct and provide a short example. Translate to English only when explicitly asked.',
+              'content': systemPrompt,
             },
             {'role': 'user', 'content': message},
           ],
@@ -67,55 +76,99 @@ class ChatService extends ChangeNotifier {
         
         // Update context with conversation data if context manager is initialized
         if (_contextManager.isInitialized) {
-          // Ask the AI to assess the language level based on this conversation
-          final assessmentPrompt = 'Based on the user\'s message: "$message", assess their proficiency level in $_targetLanguage according to CEFR standards (A1-C2). Consider vocabulary range, grammatical accuracy, fluency, and complexity. Respond with only the level designation (A1, A2, B1, B2, C1, or C2).';
-          
-          String assessedLevel = 'A1'; // Default level
-          try {
-            // Make a separate API call just for assessment
-            final assessmentResponse = await http.post(
-              uri,
-              headers: const {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'model': _ollamaModel,
-                'messages': [
-                  {
-                    'role': 'system',
-                    'content': 'You are a language assessment expert. Respond only with the CEFR level (A1, A2, B1, B2, C1, or C2).'
-                  },
-                  {'role': 'user', 'content': assessmentPrompt},
-                ],
-                'stream': false,
-                'options': {'temperature': 0.3}, // Lower temperature for more consistent assessment
-              }),
+          // Check if this is the first conversation in initial assessment mode
+          // and we need to create a student profile
+          if (_contextManager.isInitialAssessment && _contextManager.studentProfile == null) {
+            // Create a student profile based on the first conversation
+            await _contextManager.createStudentProfile(
+              targetLanguage: _targetLanguage,
+              nativeLanguage: 'English', // Default, can be updated later
+              name: 'Student',
+              interests: [], // Will be populated during assessment
             );
-            
-            if (assessmentResponse.statusCode == 200) {
-              final assessmentData = jsonDecode(assessmentResponse.body);
-              final aiAssessment = assessmentData['message']?['content'] ?? '';
-              // Extract just the level code (A1, A2, etc.)
-              final levelMatch = RegExp(r'(A1|A2|B1|B2|C1|C2)').firstMatch(aiAssessment);
-              if (levelMatch != null) {
-                assessedLevel = levelMatch.group(0)!;
-                debugPrint('AI assessed language level: $assessedLevel');
-              }
-            }
-          } catch (e) {
-            debugPrint('Error during language assessment: $e');
+            debugPrint('Created initial student profile after first conversation');
           }
           
-          // Update student profile with this conversation and the AI-assessed level
-          await _contextManager.updateProfileWithSession(
-            conversation: 'User: $message\nAssistant: $assistantMessage',
-            assessedLevel: assessedLevel,
-          );
+          // If we're in initial assessment mode, try to extract interests as well
+          List<String>? discoveredInterests;
+          if (_contextManager.isInitialAssessment) {
+            // Ask the AI to extract interests from the conversation
+            final interestsPrompt = 'Based on the conversation:\n\nUser: "$message"\nAssistant: "$assistantMessage"\n\nIdentify the user\'s interests and learning goals. List only the specific interests or topics (e.g., travel, cooking, literature) as a comma-separated list. If no clear interests are mentioned, respond with "None detected".';
+            
+            try {
+              // Make a separate API call to extract interests
+              final interestsResponse = await http.post(
+                uri,
+                headers: const {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'model': _ollamaModel,
+                  'messages': [
+                    {
+                      'role': 'system',
+                      'content': 'You are an expert at identifying user interests from conversations. Extract only specific topics of interest.'
+                    },
+                    {'role': 'user', 'content': interestsPrompt},
+                  ],
+                  'stream': false,
+                  'options': {'temperature': 0.3},
+                }),
+              );
+              
+              if (interestsResponse.statusCode == 200) {
+                final interestsData = jsonDecode(interestsResponse.body);
+                final aiInterests = interestsData['message']?['content'] ?? '';
+                
+                if (aiInterests.toLowerCase() != 'none detected') {
+                  // Use a completely manual approach to avoid type issues
+                  try {
+                    // Split by commas
+                    final parts = aiInterests.split(',');
+                    
+                    // Process each part manually
+                    final List<String> interests = [];
+                    for (final part in parts) {
+                      final trimmed = part.trim();
+                      if (trimmed.isNotEmpty) {
+                        interests.add(trimmed);
+                      }
+                    }
+                    
+                    discoveredInterests = interests;
+                    
+                    if (discoveredInterests.isNotEmpty) {
+                      debugPrint('AI discovered interests: ${discoveredInterests.join(', ')}');
+                    }
+                  } catch (e) {
+                    debugPrint('Error processing interests: $e');
+                    // If all else fails, just use the raw response
+                    discoveredInterests = [aiInterests.trim()];
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint('Error extracting interests: $e');
+            }
+          }
           
-          // Save conversation summary for debugging
-          final summary = 'Language: $_targetLanguage\nUser level: $assessedLevel\n\nUser asked about: $message';
-          await _contextManager.saveConversationSummary(
-            'User: $message\nAssistant: $assistantMessage', 
-            summary
-          );
+          // Update student profile with this conversation and any discovered interests
+          // Don't wait for assessment, it will be updated later
+          _contextManager.updateProfileWithSession(
+            conversation: 'User: $message\nAssistant: $assistantMessage',
+            discoveredInterests: discoveredInterests,
+          ).then((_) {
+            // Save conversation summary for debugging after profile is updated
+            final summary = 'Language: $_targetLanguage\n\nUser asked about: $message';
+            _contextManager.saveConversationSummary(
+              'User: $message\nAssistant: $assistantMessage', 
+              summary
+            );
+          }).catchError((e) {
+            debugPrint('Error updating profile: $e');
+          });
+          
+          // Perform assessment in the background without blocking the conversation
+          // This is completely separate from the main conversation flow
+          _performBackgroundAssessment(message, assistantMessage);
         }
         
         _isThinking = false;
@@ -130,6 +183,97 @@ class ChatService extends ChangeNotifier {
       _isThinking = false;
       notifyListeners();
       return _lastResponse;
+    }
+  }
+
+  // Strip <think>...</think> tags from the response
+  String _stripThinkTags(String text) {
+    return text.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '');
+  }
+  
+  // Perform language assessment in the background
+  void _performBackgroundAssessment(String userMessage, String assistantMessage) {
+    // Add this conversation to the pending queue
+    _pendingAssessments.add({
+      'userMessage': userMessage,
+      'assistantMessage': assistantMessage,
+    });
+    
+    // Start processing if not already in progress
+    if (!_isAssessing) {
+      _processAssessmentQueue();
+    }
+  }
+  
+  // Process the assessment queue in the background
+  Future<void> _processAssessmentQueue() async {
+    if (_pendingAssessments.isEmpty || _isAssessing) return;
+    
+    _isAssessing = true;
+    
+    try {
+      // Process one assessment at a time to avoid overloading
+      if (_pendingAssessments.isNotEmpty) {
+        final conversation = _pendingAssessments.removeAt(0);
+        final userMessage = conversation['userMessage']!;
+        final assistantMessage = conversation['assistantMessage']!;
+        
+        // Run this on a separate isolate or at least a separate async task
+        // to ensure it doesn't block the main conversation
+        Future.delayed(Duration.zero, () async {
+          try {
+            // Assess language level
+            final assessmentPrompt = 'Based on the conversation:\n\nUser: "$userMessage"\nAssistant: "$assistantMessage"\n\nAssess the user\'s proficiency level in $_targetLanguage according to CEFR standards (A1-C2). Consider vocabulary range, grammatical accuracy, fluency, and complexity. Respond with only the level designation (A1, A2, B1, B2, C1, or C2).';
+            
+            // Make API call for assessment
+            final assessmentResponse = await http.post(
+              Uri.parse('$_ollamaBaseUrl/api/chat'),
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'model': _ollamaModel,
+                'messages': [
+                  {
+                    'role': 'system',
+                    'content': 'You are a language assessment expert. Respond only with the CEFR level (A1, A2, B1, B2, C1, or C2).'
+                  },
+                  {'role': 'user', 'content': assessmentPrompt},
+                ],
+                'stream': false,
+                'options': {'temperature': 0.3},
+              }),
+            );
+            
+            if (assessmentResponse.statusCode == 200) {
+              final assessmentData = jsonDecode(assessmentResponse.body);
+              final aiAssessment = assessmentData['message']?['content'] ?? '';
+              final levelMatch = RegExp(r'(A1|A2|B1|B2|C1|C2)').firstMatch(aiAssessment);
+              if (levelMatch != null) {
+                final assessedLevel = levelMatch.group(0)!;
+                debugPrint('Background assessment complete: $assessedLevel');
+                
+                // Update the profile with the assessment result
+                if (_contextManager.isInitialized) {
+                  await _contextManager.updateProfileWithSession(
+                    conversation: 'User: $userMessage\nAssistant: $assistantMessage',
+                    assessedLevel: assessedLevel,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error in background assessment: $e');
+          } finally {
+            // Process the next item in the queue
+            _isAssessing = false;
+            _processAssessmentQueue();
+          }
+        });
+      } else {
+        _isAssessing = false;
+      }
+    } catch (e) {
+      debugPrint('Error starting assessment queue processing: $e');
+      _isAssessing = false;
     }
   }
 
@@ -149,11 +293,5 @@ class ChatService extends ChangeNotifier {
     }
     
     notifyListeners();
-  }
-
-  String _stripThinkTags(String text) {
-    // Remove <think>...</think> sections for cleaner display/TTS
-    final thinkRegex = RegExp(r'<think>[\s\S]*?<\/think>', multiLine: true);
-    return text.replaceAll(thinkRegex, '');
   }
 }

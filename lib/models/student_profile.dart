@@ -12,6 +12,7 @@ class StudentProfile {
   List<String> recentTopics;
   DateTime lastInteraction;
   int sessionCount;
+  List<String> conversationHistory; // Store recent conversations
   
   StudentProfile({
     this.name = '',
@@ -24,6 +25,7 @@ class StudentProfile {
     this.recentTopics = const [],
     DateTime? lastInteraction,
     this.sessionCount = 0,
+    this.conversationHistory = const [],
   }) : lastInteraction = lastInteraction ?? DateTime.now();
 
   // Create a profile from JSON
@@ -41,6 +43,7 @@ class StudentProfile {
           ? DateTime.parse(json['lastInteraction'])
           : DateTime.now(),
       sessionCount: json['sessionCount'] ?? 0,
+      conversationHistory: List<String>.from(json['conversationHistory'] ?? []),
     );
   }
 
@@ -57,6 +60,7 @@ class StudentProfile {
       'recentTopics': recentTopics,
       'lastInteraction': lastInteraction.toIso8601String(),
       'sessionCount': sessionCount,
+      'conversationHistory': conversationHistory,
     };
   }
 

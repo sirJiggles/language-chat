@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
+import '../services/context_manager.dart';
 import '../debug/debug_menu.dart';
 import 'settings_screen.dart';
 
@@ -15,6 +16,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
+  bool _initialAssessmentStarted = false;
   final ScrollController _scrollController = ScrollController();
   bool _cancelRecording = false;
 
@@ -32,6 +34,31 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
   void initState() {
     super.initState();
     _initializeServices();
+
+    // Schedule a check for initial assessment mode after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForInitialAssessment();
+    });
+  }
+
+  // Check if we're in initial assessment mode and start conversation if needed
+  Future<void> _checkForInitialAssessment() async {
+    final contextManager = Provider.of<ContextManager>(context, listen: false);
+
+    // Wait a moment to ensure the context manager is fully initialized
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (contextManager.isInitialized &&
+        contextManager.isInitialAssessment &&
+        !_initialAssessmentStarted) {
+      setState(() {
+        _initialAssessmentStarted = true;
+      });
+
+      // Start the conversation with an empty message to trigger the AI's initial greeting
+      final chatService = Provider.of<ChatService>(context, listen: false);
+      await chatService.sendMessage('Hallo');
+    }
   }
 
   Future<void> _initializeServices() async {
@@ -103,12 +130,34 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                         },
                       );
                     } else {
-                      return const Center(
-                        child: Text(
-                          'Hold the microphone and start speaking to begin learning!',
-                          style: TextStyle(fontSize: 16.0, color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        ),
+                      // Check if we're in initial assessment mode
+                      return Consumer<ContextManager>(
+                        builder: (context, contextManager, _) {
+                          if (contextManager.isInitialized && contextManager.isInitialAssessment) {
+                            return const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _ThinkingDots(),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Starting initial language assessment...',
+                                    style: TextStyle(fontSize: 16.0, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else {
+                            return const Center(
+                              child: Text(
+                                'Hold the microphone and start speaking to begin learning!',
+                                style: TextStyle(fontSize: 16.0, color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                            );
+                          }
+                        },
                       );
                     }
                   },
@@ -210,7 +259,35 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                           await speechService.stopListening();
                           if (!_cancelRecording && speechService.lastWords.isNotEmpty) {
                             final response = await chatService.sendMessage(speechService.lastWords);
-                            await context.read<TtsService>().speak(response);
+
+                            // Only speak the response if we're not in initial assessment mode
+                            // or if we have a student profile (meaning we're in normal chat mode)
+                            final contextManager = Provider.of<ContextManager>(
+                              context,
+                              listen: false,
+                            );
+                            final bool shouldSpeak =
+                                !contextManager.isInitialAssessment ||
+                                contextManager.studentProfile != null;
+
+                            debugPrint(
+                              'Speaking response: $shouldSpeak (isInitialAssessment: ${contextManager.isInitialAssessment}, hasProfile: ${contextManager.studentProfile != null})',
+                            );
+
+                            if (shouldSpeak) {
+                              try {
+                                // Make sure the response is a valid string that can be spoken
+                                final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
+                                await context.read<TtsService>().speak(cleanResponse);
+                              } catch (e) {
+                                debugPrint('Error speaking response: $e');
+                                // Try to stop any ongoing TTS that might be causing issues
+                                try {
+                                  await context.read<TtsService>().stop();
+                                } catch (_) {}
+                              }
+                            }
+
                             // Auto-scroll to bottom after message and response
                             _scrollToBottom();
                           } else {

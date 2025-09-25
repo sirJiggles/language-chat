@@ -48,13 +48,28 @@ class TtsService extends ChangeNotifier {
       final voices = await _flutterTts.getVoices;
       if (voices is List) {
         // cache simplified voices for UI (name/locale)
-        _availableVoices = voices.map<Map<String, String>>((v) {
-          final mv = Map<String, dynamic>.from(v as Map);
-          return {
-            if (mv['name'] != null) 'name': mv['name'].toString(),
-            if (mv['locale'] != null) 'locale': mv['locale'].toString(),
-          };
-        }).toList();
+        final List<Map<String, String>> tempVoices = [];
+        for (final v in voices) {
+          try {
+            final mv = Map<String, dynamic>.from(v as Map);
+            final voiceMap = <String, String>{};
+            
+            if (mv['name'] != null) {
+              voiceMap['name'] = mv['name'].toString();
+            }
+            
+            if (mv['locale'] != null) {
+              voiceMap['locale'] = mv['locale'].toString();
+            }
+            
+            if (voiceMap.isNotEmpty) {
+              tempVoices.add(voiceMap);
+            }
+          } catch (e) {
+            debugPrint('Error processing voice: $e');
+          }
+        }
+        _availableVoices = tempVoices;
         Map<String, dynamic>? selected;
 
         // If VOICE_NAME is specified, try exact name match first
@@ -72,12 +87,22 @@ class TtsService extends ChangeNotifier {
         selected ??= _pickBestVoiceForLocale(voices, locale);
 
         if (selected != null) {
-          final voiceMap = <String, String>{
-            if (selected['name'] != null) 'name': selected['name'].toString(),
-            if (selected['locale'] != null) 'locale': selected['locale'].toString(),
-          };
-          if (voiceMap.isNotEmpty) {
-            await _flutterTts.setVoice(voiceMap);
+          try {
+            final voiceMap = <String, String>{};
+            
+            if (selected['name'] != null) {
+              voiceMap['name'] = selected['name'].toString();
+            }
+            
+            if (selected['locale'] != null) {
+              voiceMap['locale'] = selected['locale'].toString();
+            }
+            
+            if (voiceMap.isNotEmpty) {
+              await _flutterTts.setVoice(voiceMap);
+            }
+          } catch (e) {
+            debugPrint('Error setting voice: $e');
           }
         }
       }
@@ -222,17 +247,33 @@ class TtsService extends ChangeNotifier {
   // Apply a voice by its name using cached available voices
   Future<void> _applyVoiceByName(String name) async {
     if (name.isEmpty || _availableVoices.isEmpty) return;
-    final match = _availableVoices.firstWhere(
-      (v) => (v['name'] ?? '').toLowerCase() == name.toLowerCase(),
-      orElse: () => const {},
-    );
-    if (match.isEmpty) return;
-    final voiceMap = <String, String>{
-      if (match['name'] != null) 'name': match['name']!,
-      if (match['locale'] != null) 'locale': match['locale']!,
-    };
-    if (voiceMap.isNotEmpty) {
-      await _flutterTts.setVoice(voiceMap);
+    
+    try {
+      // Find the voice by name
+      Map<String, String>? match;
+      for (final voice in _availableVoices) {
+        if ((voice['name'] ?? '').toLowerCase() == name.toLowerCase()) {
+          match = Map<String, String>.from(voice); // Create a mutable copy
+          break;
+        }
+      }
+      
+      if (match == null || match.isEmpty) return;
+      
+      // Create a new mutable map to avoid unmodifiable collection issues
+      final voiceMap = <String, String>{};
+      if (match.containsKey('name') && match['name'] != null) {
+        voiceMap['name'] = match['name']!;
+      }
+      if (match.containsKey('locale') && match['locale'] != null) {
+        voiceMap['locale'] = match['locale']!;
+      }
+      
+      if (voiceMap.isNotEmpty) {
+        await _flutterTts.setVoice(voiceMap);
+      }
+    } catch (e) {
+      debugPrint('Error applying voice by name: $e');
     }
   }
 
