@@ -7,6 +7,7 @@ import '../services/context_manager.dart';
 import '../widgets/widgets.dart';
 import '../screens/settings_screen.dart';
 import '../debug/debug_menu.dart';
+import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -95,20 +96,34 @@ class ChatScreenState extends State<ChatScreen> {
                   final messages = chatService.conversationStore.messages;
 
                   if (messages.isNotEmpty) {
+                    // First check if there's a thinking message that should be shown
+                    final thinkingMessage = messages.lastWhere(
+                      (msg) => msg.isThinking,
+                      orElse: () => Message(content: '', source: MessageSource.system),
+                    );
+                    
+                    // Filter out messages with <think> tags and thinking messages
+                    final visibleMessages = messages.where((msg) => 
+                      !msg.isThinking &&
+                      !msg.content.contains('<think>') && 
+                      !msg.content.contains('</think>') &&
+                      !msg.content.contains('<thinking id=') &&
+                      msg.content.isNotEmpty
+                    ).toList();
+                    
                     return ListView.builder(
                       controller: _scrollController,
                       // Add padding at the bottom to ensure messages aren't hidden behind controls
                       padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, controlsHeight),
-                      itemCount: messages.length,
+                      itemCount: thinkingMessage.isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                       itemBuilder: (context, index) {
-                        final message = messages[index];
-
-                        // Check if this is a thinking message
-                        if (message.isThinking) {
+                        // Show thinking bubble as the last item if there's a thinking message
+                        if (thinkingMessage.isThinking && index == visibleMessages.length) {
                           return const ThinkingBubble();
-                        } else {
-                          return ChatBubble(message: message.content, isUser: message.isUser);
                         }
+                        
+                        final message = visibleMessages[index];
+                        return ChatBubble(message: message.content, isUser: message.isUser);
                       },
                     );
                   } else {

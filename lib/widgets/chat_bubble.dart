@@ -44,31 +44,36 @@ class ChatBubble extends StatelessWidget {
             ),
             // Add play button for bot messages only
             if (!isUser)
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.volume_up,
-                    size: 16,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.tertiary.withOpacity(0.8), // Blue
-                  ),
-                  constraints: const BoxConstraints(
-                    maxHeight: 24,
-                    maxWidth: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    // Get the message text
-                    final messageText = message;
-                    // Play the audio
-                    final ttsService = Provider.of<TtsService>(context, listen: false);
-                    ttsService.speak(messageText);
-                  },
-                ),
+              Consumer<TtsService>(
+                builder: (context, ttsService, _) {
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.volume_up,
+                        size: 16,
+                        color: ttsService.isSpeaking 
+                            ? Theme.of(context).colorScheme.tertiary.withOpacity(0.4) // Dimmed when disabled
+                            : Theme.of(context).colorScheme.tertiary.withOpacity(0.8), // Normal color
+                      ),
+                      constraints: const BoxConstraints(
+                        maxHeight: 24,
+                        maxWidth: 24,
+                      ),
+                      padding: EdgeInsets.zero,
+                      iconSize: 16,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: ttsService.isSpeaking 
+                          ? null // Disable button while speaking
+                          : () {
+                              // Get the message text
+                              final messageText = message;
+                              // Play the audio
+                              ttsService.speak(messageText);
+                            },
+                    ),
+                  );
+                },
               ),
           ],
         ),

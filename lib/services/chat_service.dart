@@ -67,7 +67,7 @@ class ChatService extends ChangeNotifier {
       _thinkingMessageId = 'thinking_$timestamp';
 
       final thinkingMessage = Message(
-        content: '<thinking id="$_thinkingMessageId">...</thinking>',
+        content: '...',  // Simple content for thinking message
         source: MessageSource.conversationBot,
         isThinking: true,
         id: _thinkingMessageId,
@@ -115,6 +115,10 @@ class ChatService extends ChangeNotifier {
 
         // Filter out any content wrapped in <think></think> tags
         final filteredMessage = _filterThinkingContent(assistantMessage);
+        
+        // Debug the filtering
+        debugPrint('Original message: $assistantMessage');
+        debugPrint('Filtered message: $filteredMessage');
 
         // Remove the thinking message
         _conversationStore.removeThinking();
