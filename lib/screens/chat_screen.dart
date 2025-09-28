@@ -16,7 +16,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
-  bool _initialAssessmentStarted = false;
+  bool _botGreetingSent = false;
   final ScrollController _scrollController = ScrollController();
   bool _cancelRecording = false;
 
@@ -41,23 +41,22 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
     });
   }
 
-  // Check if we're in initial assessment mode and start conversation if needed
+  // Start the conversation with the bot greeting automatically
   Future<void> _checkForInitialAssessment() async {
     final contextManager = Provider.of<ContextManager>(context, listen: false);
 
     // Wait a moment to ensure the context manager is fully initialized
     await Future.delayed(const Duration(milliseconds: 500));
 
-    if (contextManager.isInitialized &&
-        contextManager.isInitialAssessment &&
-        !_initialAssessmentStarted) {
+    if (contextManager.isInitialized && !_botGreetingSent) {
       setState(() {
-        _initialAssessmentStarted = true;
+        _botGreetingSent = true;
       });
 
       // Start the conversation with an empty message to trigger the AI's initial greeting
+      // Hide this message from the conversation display
       final chatService = Provider.of<ChatService>(context, listen: false);
-      await chatService.sendMessage('Hallo');
+      await chatService.sendMessage('Hallo', hideUserMessage: true);
     }
   }
 
@@ -84,6 +83,7 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
           // Main chat content
           Column(
             children: [
+              const SizedBox(height: 16),
               Expanded(
                 child: Consumer<ChatService>(
                   builder: (context, chatService, _) {
@@ -130,10 +130,10 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                         },
                       );
                     } else {
-                      // Check if we're in initial assessment mode
+                      // Show loading message while bot is preparing greeting
                       return Consumer<ContextManager>(
                         builder: (context, contextManager, _) {
-                          if (contextManager.isInitialized && contextManager.isInitialAssessment) {
+                          if (!_botGreetingSent) {
                             return const Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -141,7 +141,7 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                                   _ThinkingDots(),
                                   SizedBox(height: 16),
                                   Text(
-                                    'Starting initial language assessment...',
+                                    'Starting conversation...',
                                     style: TextStyle(fontSize: 16.0, color: Colors.grey),
                                     textAlign: TextAlign.center,
                                   ),
@@ -151,7 +151,7 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                           } else {
                             return const Center(
                               child: Text(
-                                'Hold the microphone and start speaking to begin learning!',
+                                'Welcome!',
                                 style: TextStyle(fontSize: 16.0, color: Colors.grey),
                                 textAlign: TextAlign.center,
                               ),
@@ -260,19 +260,10 @@ class ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMi
                           if (!_cancelRecording && speechService.lastWords.isNotEmpty) {
                             final response = await chatService.sendMessage(speechService.lastWords);
 
-                            // Only speak the response if we're not in initial assessment mode
-                            // or if we have a student profile (meaning we're in normal chat mode)
-                            final contextManager = Provider.of<ContextManager>(
-                              context,
-                              listen: false,
-                            );
-                            final bool shouldSpeak =
-                                !contextManager.isInitialAssessment ||
-                                contextManager.studentProfile != null;
+                            // Always speak the response
+                            final bool shouldSpeak = true;
 
-                            debugPrint(
-                              'Speaking response: $shouldSpeak (isInitialAssessment: ${contextManager.isInitialAssessment}, hasProfile: ${contextManager.studentProfile != null})',
-                            );
+                            debugPrint('Speaking response: $shouldSpeak');
 
                             if (shouldSpeak) {
                               try {

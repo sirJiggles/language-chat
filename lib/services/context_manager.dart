@@ -15,13 +15,14 @@ class ContextManager extends ChangeNotifier {
   StudentProfile? _studentProfile;
   final Map<String, String> _contextFiles = {};
   bool _isInitialized = false;
-  bool _isInitialAssessment = false; // Flag to indicate if we're in initial assessment mode
+  // No longer using initial assessment mode as we're always assessing in background
   
   // Getters
   StudentProfile? get studentProfile => _studentProfile;
   bool get isInitialized => _isInitialized;
   Map<String, String> get contextFiles => _contextFiles;
-  bool get isInitialAssessment => _isInitialAssessment;
+  // Always return false for isInitialAssessment since we're always in regular mode
+  bool get isInitialAssessment => false;
   
   // Initialize the context manager
   Future<void> initialize() async {
@@ -146,48 +147,46 @@ class ContextManager extends ChangeNotifier {
         final json = jsonDecode(content);
         _studentProfile = StudentProfile.fromJson(json);
         debugPrint('Student profile loaded successfully: ${_studentProfile!.targetLanguage} (${_studentProfile!.proficiencyLevel})');
-        _isInitialAssessment = false; // Not in assessment mode since we have a profile
+        // No need to set assessment mode flag as we're always in regular mode
       } else {
-        debugPrint('No existing student profile found, entering initial assessment mode');
-        // Don't create a profile yet - we'll create it after the first conversation
-        // Just set the initial assessment flag to true
-        _isInitialAssessment = true;
-        debugPrint('Entering initial assessment mode');
+        debugPrint('No existing student profile found, creating default profile');
+        // Create a default profile right away instead of waiting for assessment
+        _createDefaultProfile();
       }
     } catch (e) {
       debugPrint('Error loading student profile: $e');
     }
   }
   
-  // Save student profile - non-blocking version
+  // Save student profile - ensures the profile is properly saved
   Future<void> saveStudentProfile() async {
-    if (_studentProfile == null) return;
-    
-    // Run in a separate async task to avoid blocking
-    Future<void> saveTask() async {
-      try {
-        final baseDir = await _getContextDirectory();
-        final profileFile = File('${baseDir.path}/context/student_profile.json');
-        
-        debugPrint('Saving student profile to: ${profileFile.path}');
-        
-        // Create directory if it doesn't exist
-        final directory = Directory(baseDir.path + '/context');
-        if (!await directory.exists()) {
-          await directory.create(recursive: true);
-        }
-        
-        // Convert profile to JSON and save
-        final json = jsonEncode(_studentProfile);
-        await profileFile.writeAsString(json);
-        debugPrint('Student profile saved successfully');
-      } catch (e) {
-        debugPrint('Error saving student profile: $e');
-      }
+    if (_studentProfile == null) {
+      debugPrint('Cannot save profile: profile is null');
+      return;
     }
     
-    // Start the save task without awaiting it
-    saveTask();
+    debugPrint('Saving student profile with level: ${_studentProfile!.proficiencyLevel}, interests: ${_studentProfile!.interests.join(', ')}');
+    
+    try {
+      final baseDir = await _getContextDirectory();
+      final profileFile = File('${baseDir.path}/context/student_profile.json');
+      
+      // Create directory if it doesn't exist
+      final directory = Directory(baseDir.path + '/context');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      // Convert profile to JSON and save
+      final json = jsonEncode(_studentProfile);
+      await profileFile.writeAsString(json);
+      debugPrint('Student profile saved successfully');
+      
+      // Make sure listeners are notified of the change
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error saving student profile: $e');
+    }
   }
   
   // Create a new student profile
@@ -213,6 +212,7 @@ class ContextManager extends ChangeNotifier {
     required String conversation,
     String? assessedLevel,
     List<String>? discoveredInterests,
+    bool isSystemMessage = false,
   }) async {
     // Return early if no profile exists
     if (_studentProfile == null) return;
@@ -276,24 +276,17 @@ class ContextManager extends ChangeNotifier {
       // Continue despite errors to avoid blocking the main conversation
     }
     
-    // If we're in initial assessment mode and we have a level and interests, complete the assessment
-    if (_isInitialAssessment && _studentProfile != null) {
-      // Check if we have enough information to complete the assessment
-      bool hasLevel = _studentProfile!.proficiencyLevel.isNotEmpty;
-      bool hasInterests = _studentProfile!.interests.isNotEmpty;
-      
-      debugPrint('Assessment check - hasLevel: $hasLevel, hasInterests: $hasInterests');
-      
-      if (hasLevel && hasInterests && _studentProfile!.interests.length >= 1) {
-        _completeInitialAssessment();
-      } else if (hasLevel && discoveredInterests != null && discoveredInterests.isNotEmpty) {
-        // If we have discovered interests in this update, complete the assessment
-        _completeInitialAssessment();
-      }
-    }
+    // No longer need to check for completing initial assessment
+    // as we're always in regular mode with continuous background assessment
     
+    // Make sure to save the profile and notify listeners
+    // This ensures the UI updates with the new profile data
     await saveStudentProfile();
-    notifyListeners();
+    
+    // Double check that the profile was updated correctly
+    debugPrint('Profile updated with new conversation data');
+    debugPrint('Current profile - Level: ${_studentProfile!.proficiencyLevel}, Interests: ${_studentProfile!.interests.join(', ')}');
+    debugPrint('Conversation history count: ${_studentProfile!.conversationHistory.length}');
   }
   
   // Get index of CEFR level for comparison
@@ -362,11 +355,16 @@ $conversation
     return commonTopics.where((topic) => lowerConversation.contains(topic)).toList();
   }
   
-  // Complete the initial assessment
-  void _completeInitialAssessment() {
-    _isInitialAssessment = false;
-    debugPrint('Initial assessment completed');
-    debugPrint('Final profile - Level: ${_studentProfile!.proficiencyLevel}, Interests: ${_studentProfile!.interests.join(', ')}');
+  // Create a default profile when none exists
+  Future<void> _createDefaultProfile() async {
+    _studentProfile = StudentProfile(
+      name: 'Student',
+      targetLanguage: 'Spanish', // Default language
+      nativeLanguage: 'English',
+      interests: [], // Will be populated during conversations
+    );
+    await saveStudentProfile();
+    debugPrint('Created default student profile');
     notifyListeners();
   }
   
@@ -377,29 +375,7 @@ $conversation
       return 'You are a helpful language learning assistant. Keep responses concise and clear.';
     }
     
-    // If we're in initial assessment mode, use the initial assessment prompt
-    if (_isInitialAssessment) {
-      final initialAssessmentContent = _contextFiles['initial_assessment.md'] ?? '';
-      final targetLanguage = _studentProfile!.targetLanguage;
-      
-      return '''
-      You are a ${targetLanguage} language teacher conducting an initial assessment conversation with a new student.
-      
-      Your goal is to:
-      1. Assess the student's proficiency level in ${targetLanguage} through natural conversation
-      2. Discover their interests and learning goals
-      3. Make them feel comfortable and build rapport
-      
-      Start with simple greetings and gradually increase complexity to determine their level.
-      Ask about their interests, hobbies, and why they're learning ${targetLanguage}.
-      
-      Assessment Guide:
-      $initialAssessmentContent
-      
-      Keep your responses in ${targetLanguage} appropriate to their level, with occasional English explanations if needed.
-      Be encouraging and supportive throughout the conversation.
-      ''';
-    }
+    // We're always in regular conversation mode now
     
     final level = _studentProfile!.proficiencyLevel;
     final targetLanguage = _studentProfile!.targetLanguage;
@@ -435,5 +411,51 @@ Instructions:
 6. If the student is struggling, provide scaffolding or simplify your language.
 7. Encourage the student to express themselves and take conversational risks.
 ''';
+  }
+  
+  // Get context for the prompt
+  Future<String> getContextForPrompt() async {
+    if (_studentProfile == null) {
+      return '';
+    }
+    
+    // Build context based on student profile and conversation history
+    final contextBuilder = StringBuffer();
+    
+    // Add basic profile information
+    contextBuilder.writeln('Student Profile:');
+    contextBuilder.writeln('- Name: ${_studentProfile!.name}');
+    contextBuilder.writeln('- Target Language: ${_studentProfile!.targetLanguage}');
+    contextBuilder.writeln('- Native Language: ${_studentProfile!.nativeLanguage}');
+    contextBuilder.writeln('- Proficiency Level: ${_studentProfile!.proficiencyLevel}');
+    
+    // Add interests if available
+    if (_studentProfile!.interests.isNotEmpty) {
+      contextBuilder.writeln('- Interests: ${_studentProfile!.interests.join(', ')}');
+    }
+    
+    // Add recent topics if available
+    if (_studentProfile!.recentTopics.isNotEmpty) {
+      contextBuilder.writeln('- Recent Topics: ${_studentProfile!.recentTopics.join(', ')}');
+    }
+    
+    // Add recent conversation snippets (limited to avoid context overflow)
+    if (_studentProfile!.conversationHistory.isNotEmpty) {
+      contextBuilder.writeln('\nRecent Conversations:');
+      // Get the last 2 conversations at most
+      final recentConversations = _studentProfile!.conversationHistory.length > 2 ?
+          _studentProfile!.conversationHistory.sublist(_studentProfile!.conversationHistory.length - 2) :
+          _studentProfile!.conversationHistory;
+      
+      for (final conversation in recentConversations) {
+        // Limit each conversation to a reasonable length
+        final truncatedConversation = conversation.length > 200 ?
+            '${conversation.substring(0, 200)}...' : conversation;
+        contextBuilder.writeln(truncatedConversation);
+        contextBuilder.writeln('---');
+      }
+    }
+    
+    return contextBuilder.toString();
   }
 }
