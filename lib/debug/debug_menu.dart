@@ -6,6 +6,7 @@ import '../services/context_manager.dart';
 import '../services/chat_service.dart';
 import 'assessment_view.dart';
 import 'assessment_thinking_viewer.dart';
+import '../screens/assessment_screen.dart';
 
 /// A debug menu to access debugging tools
 class DebugMenu extends StatelessWidget {
@@ -83,6 +84,14 @@ class DebugMenu extends StatelessWidget {
                   subtitle: const Text('See the assessment reasoning process as a chat'),
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentThinkingViewer()));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.psychology),
+                  title: const Text('New Assessment View'),
+                  subtitle: const Text('View assessments with the new message model'),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentScreen()));
                   },
                 ),
                 ListTile(

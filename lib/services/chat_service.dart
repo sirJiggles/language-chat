@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/message.dart';
+import '../models/message_store.dart';
 import 'context_manager.dart';
 import 'assessment_service.dart';
 
@@ -9,6 +11,10 @@ class ChatService extends ChangeNotifier {
   final String _ollamaModel;
   final ContextManager _contextManager;
   final AssessmentService _assessmentService;
+
+  // Separate message stores for conversation and assessment
+  late final MessageStore _conversationStore;
+  late final MessageStore _assessmentStore;
 
   ChatService({
     required String ollamaBaseUrl,
@@ -21,18 +27,22 @@ class ChatService extends ChangeNotifier {
        _contextManager = contextManager,
        _assessmentService = assessmentService {
     _targetLanguage = targetLanguage;
-    // Assessment results are now loaded by AssessmentService
+    _conversationStore = MessageStore(name: 'conversation');
+    _assessmentStore = MessageStore(name: 'assessment');
   }
 
   late String _targetLanguage;
-  String _conversation = '';
   String _lastResponse = '';
   bool _isThinking = false;
   String _thinkingMessageId = '';
 
-  // Assessment results are now managed by AssessmentService
+  // Legacy support for string-based conversation
+  String get conversation => _conversationStore.legacyConversation;
 
-  String get conversation => _conversation;
+  // New message-based access
+  MessageStore get conversationStore => _conversationStore;
+  MessageStore get assessmentStore => _assessmentStore;
+
   String get lastResponse => _lastResponse;
   String get targetLanguage => _targetLanguage;
   bool get isThinking => _isThinking;
@@ -40,19 +50,30 @@ class ChatService extends ChangeNotifier {
   String get assessmentLog => _assessmentService.assessmentLog;
 
   Future<String> sendMessage(String message, {bool hideUserMessage = false}) async {
+    // Create a user message
+    final userMessage = Message(content: message, source: MessageSource.user);
+
     // Only add the user message to the conversation if not hidden
     if (!hideUserMessage) {
-      _conversation += 'User: $message\n';
+      _conversationStore.addMessage(userMessage);
       notifyListeners();
     }
 
     try {
       _isThinking = true;
-      
+
       // Add thinking message to the conversation
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       _thinkingMessageId = 'thinking_$timestamp';
-      _conversation += 'Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n';
+
+      final thinkingMessage = Message(
+        content: '<thinking id="$_thinkingMessageId">...</thinking>',
+        source: MessageSource.conversationBot,
+        isThinking: true,
+        id: _thinkingMessageId,
+      );
+
+      _conversationStore.addMessage(thinkingMessage);
       notifyListeners();
 
       // Prepare context for the conversation
@@ -94,43 +115,80 @@ class ChatService extends ChangeNotifier {
 
         // Filter out any content wrapped in <think></think> tags
         final filteredMessage = _filterThinkingContent(assistantMessage);
-        
-        // Remove the thinking message and add the real response
-        _conversation = _conversation.replaceAll('Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n', '');
-        _conversation += 'Assistant: $filteredMessage\n';
+
+        // Remove the thinking message
+        _conversationStore.removeThinking();
+
+        // Only add the message to the conversation if it's not empty after filtering
+        if (filteredMessage.isNotEmpty) {
+          // Add the real response
+          _conversationStore.addMessage(
+            Message(content: filteredMessage, source: MessageSource.conversationBot),
+          );
+        }
+
         _lastResponse = filteredMessage;
 
         // Perform background assessment - use the original message for assessment
-        _assessmentService.performBackgroundAssessment(message, assistantMessage, _targetLanguage, hideUserMessage: hideUserMessage);
+        await _assessmentService.performBackgroundAssessment(
+          message,
+          assistantMessage,
+          _targetLanguage,
+          hideUserMessage: hideUserMessage,
+        );
+
+        // Add assessment messages to the assessment store
+        if (_assessmentService.lastAssessmentMessage != null) {
+          _assessmentStore.addMessage(_assessmentService.lastAssessmentMessage!);
+        }
 
         // Return the filtered message to the user
         return filteredMessage;
       } else {
         final errorMessage = 'Error: ${response.statusCode} - ${response.body}';
         debugPrint(errorMessage);
+
+        // Add error message to conversation
+        _conversationStore.addMessage(
+          Message(
+            content: 'Sorry, I encountered an error. Please try again.',
+            source: MessageSource.system,
+          ),
+        );
+
         return 'Sorry, I encountered an error. Please try again.';
       }
     } catch (e) {
       debugPrint('Error sending message: $e');
+
+      // Add error message to conversation
+      _conversationStore.addMessage(
+        Message(
+          content: 'Sorry, I encountered an error. Please try again.',
+          source: MessageSource.system,
+        ),
+      );
+
       return 'Sorry, I encountered an error. Please try again.';
     } finally {
       _isThinking = false;
-      
+
       // Make sure the thinking message is removed in case of error
-      if (_conversation.contains('<thinking id="$_thinkingMessageId">...</thinking>')) {
-        _conversation = _conversation.replaceAll('Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n', '');
-      }
-      
+      _conversationStore.removeThinking();
+
       _thinkingMessageId = '';
       notifyListeners();
     }
   }
 
-  // Assessment functionality moved to AssessmentService
-
   void clearConversation() {
-    _conversation = '';
+    _conversationStore.clear();
     _lastResponse = '';
+    notifyListeners();
+  }
+
+  void clearAssessment() {
+    _assessmentStore.clear();
     notifyListeners();
   }
 
@@ -150,6 +208,28 @@ class ChatService extends ChangeNotifier {
   String _filterThinkingContent(String message) {
     // Use regex to remove any content between <think> and </think> tags
     final thinkingPattern = RegExp(r'<think>.*?</think>', dotAll: true);
-    return message.replaceAll(thinkingPattern, '').trim();
+    final filteredMessage = message.replaceAll(thinkingPattern, '').trim();
+    
+    // If the message contains thinking content, add it to the assessment store
+    if (message.contains('<think>')) {
+      // Extract the thinking content
+      final thinkingContent = _extractThinkingContent(message);
+      if (thinkingContent.isNotEmpty) {
+        // Create an assessment message with the thinking content
+        _assessmentStore.addMessage(Message(
+          content: thinkingContent,
+          source: MessageSource.assessmentBot,
+        ));
+      }
+    }
+    
+    return filteredMessage;
+  }
+  
+  // Extract content from <think></think> tags
+  String _extractThinkingContent(String message) {
+    final thinkingPattern = RegExp(r'<think>(.*?)</think>', dotAll: true);
+    final match = thinkingPattern.firstMatch(message);
+    return match?.group(1)?.trim() ?? '';
   }
 }

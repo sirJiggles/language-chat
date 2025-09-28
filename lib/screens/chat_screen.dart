@@ -91,34 +91,23 @@ class ChatScreenState extends State<ChatScreen> {
             Positioned.fill(
               child: Consumer<ChatService>(
                 builder: (context, chatService, _) {
-                  if (chatService.conversation.isNotEmpty) {
+                  // Use the message store for conversation
+                  final messages = chatService.conversationStore.messages;
+
+                  if (messages.isNotEmpty) {
                     return ListView.builder(
                       controller: _scrollController,
                       // Add padding at the bottom to ensure messages aren't hidden behind controls
                       padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, controlsHeight),
-                      itemCount: chatService.conversation
-                          .split('\n')
-                          .where((line) => line.isNotEmpty)
-                          .length,
+                      itemCount: messages.length,
                       itemBuilder: (context, index) {
-                        final lines = chatService.conversation
-                            .split('\n')
-                            .where((line) => line.isNotEmpty)
-                            .toList();
-                        final line = lines[index];
-                        final isUser = line.startsWith('User:');
+                        final message = messages[index];
 
                         // Check if this is a thinking message
-                        if (line.contains('<thinking id=')) {
+                        if (message.isThinking) {
                           return const ThinkingBubble();
                         } else {
-                          return ChatBubble(
-                            message: line
-                                .replaceFirst('User:', '')
-                                .replaceFirst('Assistant:', '')
-                                .trim(),
-                            isUser: isUser,
-                          );
+                          return ChatBubble(message: message.content, isUser: message.isUser);
                         }
                       },
                     );
@@ -175,7 +164,7 @@ class ChatScreenState extends State<ChatScreen> {
                 ),
                 child: FrostedGlass(
                   blurAmount: 5.0,
-                  tintColor: Colors.black,
+                  tintColor: const Color.fromARGB(255, 37, 37, 37),
                   tintOpacity: 0.8,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
