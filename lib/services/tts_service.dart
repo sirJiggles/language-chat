@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TtsService extends ChangeNotifier {
   final FlutterTts _flutterTts = FlutterTts();
@@ -7,40 +9,37 @@ class TtsService extends ChangeNotifier {
   String? _lastSpokenText;
 
   // Env-driven defaults
-  static const String _envVoiceName = String.fromEnvironment('VOICE_NAME');
   static const String _envTargetLanguage = String.fromEnvironment('TARGET_LANGUAGE', defaultValue: 'Spanish');
-  static const String _envRate = String.fromEnvironment('TTS_RATE', defaultValue: '0.5');
-  static const String _envPitch = String.fromEnvironment('TTS_PITCH', defaultValue: '1.0');
-  // No HTTP mode: device TTS only
-
-  // Runtime-updatable settings (initialized from env defaults)
-  String _voiceName = _envVoiceName;
-  double _rate = double.tryParse(_envRate) ?? 0.5;
-  double _pitch = double.tryParse(_envPitch) ?? 1.0;
+  
+  // Runtime-updatable settings
+  String _voiceName = '';
   String _preferredLanguage = _envTargetLanguage;
   List<Map<String, String>> _availableVoices = const [];
   final Map<String, String> _preferredVoicesByLang = {}; // langCode -> voiceName
 
+  // Keys for shared preferences
+  static const String _keyVoiceName = 'tts_voice_name';
+  static const String _keyPreferredLanguage = 'tts_preferred_language';
+  static const String _keyPreferredVoicesByLang = 'tts_preferred_voices_by_lang';
+
   bool get isSpeaking => _isSpeaking;
   String? get lastSpokenText => _lastSpokenText;
   String get voiceName => _voiceName;
-  double get rate => _rate;
-  double get pitch => _pitch;
   String get preferredLanguage => _preferredLanguage;
   List<Map<String, String>> get availableVoices => _availableVoices;
   String? getPreferredVoiceForLanguage(String langCode) => _preferredVoicesByLang[langCode];
 
   Future<void> initialize() async {
-    final rate = _rate;
-    final pitch = _pitch;
-
+    // Load saved settings
+    await _loadSettings();
+    
     // Pick a suitable locale (language-region) based on TARGET_LANGUAGE
     final locale = _mapTargetLanguageToLocale(_preferredLanguage);
 
-    // Set basic params first
+    // Set basic params
     await _flutterTts.setLanguage(locale);
-    await _flutterTts.setSpeechRate(rate);
-    await _flutterTts.setPitch(pitch);
+    await _flutterTts.setSpeechRate(0.5); // Fixed rate
+    await _flutterTts.setPitch(1.0);      // Fixed pitch
     await _flutterTts.setVolume(1.0);
 
     // Try to select a high-quality voice automatically
@@ -92,6 +91,7 @@ class TtsService extends ChangeNotifier {
             
             if (selected['name'] != null) {
               voiceMap['name'] = selected['name'].toString();
+              _voiceName = selected['name'].toString();
             }
             
             if (selected['locale'] != null) {
@@ -106,60 +106,84 @@ class TtsService extends ChangeNotifier {
           }
         }
       }
-    } catch (_) {
-      // Ignore voice selection failures; default engine voice will be used
+    } catch (e) {
+      debugPrint('Error initializing TTS voices: $e');
     }
 
-    _flutterTts.setStartHandler(() {
-      _isSpeaking = true;
-      notifyListeners();
-    });
-
+    // Set up completion listener
     _flutterTts.setCompletionHandler(() {
       _isSpeaking = false;
       notifyListeners();
     });
-
-    _flutterTts.setErrorHandler((msg) {
-      _isSpeaking = false;
-      notifyListeners();
-    });
   }
 
-  Future<void> speak(String text, {String? language}) async {
-    _lastSpokenText = text;
-    final langName = language ?? _preferredLanguage;
-    final lang = _mapTargetLanguageToLocale(langName);
-    final langCode = _langToCode(langName);
+  Map<String, dynamic>? _pickBestVoiceForLocale(List<dynamic> voices, String locale) {
+    // First try exact locale match
+    for (final v in voices) {
+      try {
+        final mv = Map<String, dynamic>.from(v as Map);
+        final voiceLocale = (mv['locale'] ?? '').toString().toLowerCase();
+        if (voiceLocale == locale.toLowerCase()) {
+          return mv;
+        }
+      } catch (e) {
+        debugPrint('Error checking voice locale: $e');
+      }
+    }
 
-    // Do not speak if text is only/mostly emojis or has no readable content
+    // Then try language code match (e.g., 'es' for 'es-ES')
+    final langCode = locale.split('-').first.toLowerCase();
+    for (final v in voices) {
+      try {
+        final mv = Map<String, dynamic>.from(v as Map);
+        final voiceLocale = (mv['locale'] ?? '').toString().toLowerCase();
+        if (voiceLocale.startsWith('$langCode-')) {
+          return mv;
+        }
+      } catch (e) {
+        debugPrint('Error checking voice language: $e');
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> speak(String text) async {
+    if (text.isEmpty) return;
+    
+    // Skip if already speaking
+    if (_isSpeaking) {
+      await stop();
+    }
+
+    // Check if we should speak this text (e.g., not just emojis)
     if (!_shouldSpeak(text)) {
-      notifyListeners();
+      debugPrint('Skipping TTS for text that should not be spoken: $text');
       return;
     }
 
-    // Strip emojis so we only speak readable text
-    final toSpeak = _stripEmojis(text).trim();
-    if (toSpeak.isEmpty) {
-      notifyListeners();
-      return;
-    }
-
-    // Apply preferred voice: explicit selection wins, else per-language mapping
-    final selectedVoice = _voiceName.isNotEmpty ? _voiceName : (_preferredVoicesByLang[langCode] ?? '');
-    if (selectedVoice.isNotEmpty) {
-      await _applyVoiceByName(selectedVoice);
-    }
-
-    await _flutterTts.setLanguage(lang);
-    await _flutterTts.speak(toSpeak);
+    // Clean up text for better TTS
+    final cleanText = _stripEmojis(text);
+    
+    _lastSpokenText = cleanText;
+    _isSpeaking = true;
     notifyListeners();
+    
+    try {
+      await _flutterTts.speak(cleanText);
+    } catch (e) {
+      debugPrint('Error speaking text: $e');
+      _isSpeaking = false;
+      notifyListeners();
+    }
   }
 
   Future<void> stop() async {
-    await _flutterTts.stop();
-    _isSpeaking = false;
-    notifyListeners();
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+      _isSpeaking = false;
+      notifyListeners();
+    }
   }
 
   @override
@@ -173,26 +197,24 @@ class TtsService extends ChangeNotifier {
     _voiceName = name;
     // Apply immediately if possible
     _applyVoiceByName(name);
-    notifyListeners();
-  }
-
-  void setRate(double value) {
-    _rate = value.clamp(0.1, 1.0);
-    _flutterTts.setSpeechRate(_rate);
-    notifyListeners();
-  }
-
-  void setPitch(double value) {
-    _pitch = value.clamp(0.5, 2.0);
-    _flutterTts.setPitch(_pitch);
+    // Save settings
+    _saveSettings();
     notifyListeners();
   }
 
   void setPreferredLanguage(String lang) {
+    if (lang == _preferredLanguage) return;
     _preferredLanguage = lang;
-    // Re-apply language to engine for next speak
-    _flutterTts.setLanguage(_mapTargetLanguageToLocale(_preferredLanguage));
+    final locale = _mapTargetLanguageToLocale(lang);
+    _flutterTts.setLanguage(locale);
+    _saveSettings();
     notifyListeners();
+    // Re-apply preferred voice for the new language
+    final langCode = _langToCode(lang);
+    final preferredVoice = _preferredVoicesByLang[langCode] ?? '';
+    if (preferredVoice.isNotEmpty) {
+      _applyVoiceByName(preferredVoice);
+    }
   }
 
   void setPreferredVoiceForLanguage(String langCode, String voiceName) {
@@ -201,6 +223,7 @@ class TtsService extends ChangeNotifier {
     } else {
       _preferredVoicesByLang[langCode] = voiceName;
     }
+    _saveSettings();
     notifyListeners();
   }
 
@@ -210,6 +233,7 @@ class TtsService extends ChangeNotifier {
     await _applyVoiceByName(voiceName);
     await _flutterTts.speak('This is a preview.');
   }
+  
   String _mapTargetLanguageToLocale(String language) {
     final l = language.toLowerCase();
     if (l.startsWith('spanish') || l.startsWith('es')) return 'es-ES';
@@ -221,32 +245,18 @@ class TtsService extends ChangeNotifier {
     if (l.startsWith('chinese') || l.startsWith('zh')) return 'zh-CN';
     if (l.startsWith('korean') || l.startsWith('ko')) return 'ko-KR';
     if (l.startsWith('english') || l.startsWith('en')) return 'en-US';
+    if (l.startsWith('dutch') || l.startsWith('nl')) return 'nl-NL';
+    if (l.startsWith('swedish') || l.startsWith('sv')) return 'sv-SE';
+    if (l.startsWith('norwegian') || l.startsWith('no')) return 'no-NO';
+    if (l.startsWith('danish') || l.startsWith('da')) return 'da-DK';
+    if (l.startsWith('polish') || l.startsWith('pl')) return 'pl-PL';
+    if (l.startsWith('russian') || l.startsWith('ru')) return 'ru-RU';
+    if (l.startsWith('turkish') || l.startsWith('tr')) return 'tr-TR';
     return 'en-US';
   }
 
-  Map<String, dynamic>? _pickBestVoiceForLocale(List voices, String locale) {
-    Map<String, dynamic>? exact;
-    Map<String, dynamic>? sameLang; // e.g., de-XX if de-DE not available
-    for (final v in voices) {
-      final mv = Map<String, dynamic>.from(v as Map);
-      final vLocale = (mv['locale'] ?? '').toString();
-      final vName = (mv['name'] ?? '').toString().toLowerCase();
-      // Prefer enhanced/natural voices if flagged in name
-      final isEnhanced = vName.contains('enhanced') || vName.contains('premium') || vName.contains('siri') || vName.contains('natural');
-
-      if (vLocale == locale) {
-        if (exact == null) exact = mv;
-        if (isEnhanced) return mv; // best pick
-      } else if (vLocale.split('-').first == locale.split('-').first) {
-        if (sameLang == null) sameLang = mv;
-      }
-    }
-    return exact ?? sameLang;
-  }
-
-  // Apply a voice by its name using cached available voices
   Future<void> _applyVoiceByName(String name) async {
-    if (name.isEmpty || _availableVoices.isEmpty) return;
+    if (name.isEmpty) return;
     
     try {
       // Find the voice by name
@@ -297,6 +307,65 @@ class TtsService extends ChangeNotifier {
     if (l.startsWith('russian') || l.startsWith('ru')) return 'ru';
     if (l.startsWith('turkish') || l.startsWith('tr')) return 'tr';
     return 'en';
+  }
+
+  // Load settings from shared preferences
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load voice name
+      final savedVoiceName = prefs.getString(_keyVoiceName);
+      if (savedVoiceName != null && savedVoiceName.isNotEmpty) {
+        _voiceName = savedVoiceName;
+      }
+      
+      // Load preferred language
+      final savedLanguage = prefs.getString(_keyPreferredLanguage);
+      if (savedLanguage != null && savedLanguage.isNotEmpty) {
+        _preferredLanguage = savedLanguage;
+      }
+      
+      // Load preferred voices by language
+      final savedVoicesByLang = prefs.getString(_keyPreferredVoicesByLang);
+      if (savedVoicesByLang != null && savedVoicesByLang.isNotEmpty) {
+        try {
+          final Map<String, dynamic> voicesMap = jsonDecode(savedVoicesByLang);
+          _preferredVoicesByLang.clear();
+          voicesMap.forEach((key, value) {
+            if (value is String) {
+              _preferredVoicesByLang[key] = value;
+            }
+          });
+        } catch (e) {
+          debugPrint('Error parsing saved voices by language: $e');
+        }
+      }
+      
+      debugPrint('Loaded TTS settings from preferences');
+    } catch (e) {
+      debugPrint('Error loading TTS settings: $e');
+    }
+  }
+  
+  // Save settings to shared preferences
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Save voice name
+      await prefs.setString(_keyVoiceName, _voiceName);
+      
+      // Save preferred language
+      await prefs.setString(_keyPreferredLanguage, _preferredLanguage);
+      
+      // Save preferred voices by language
+      await prefs.setString(_keyPreferredVoicesByLang, jsonEncode(_preferredVoicesByLang));
+      
+      debugPrint('Saved TTS settings to preferences');
+    } catch (e) {
+      debugPrint('Error saving TTS settings: $e');
+    }
   }
 
   // ------------- speak filters -------------

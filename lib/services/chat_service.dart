@@ -28,6 +28,7 @@ class ChatService extends ChangeNotifier {
   String _conversation = '';
   String _lastResponse = '';
   bool _isThinking = false;
+  String _thinkingMessageId = '';
 
   // Assessment results are now managed by AssessmentService
 
@@ -47,6 +48,11 @@ class ChatService extends ChangeNotifier {
 
     try {
       _isThinking = true;
+      
+      // Add thinking message to the conversation
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      _thinkingMessageId = 'thinking_$timestamp';
+      _conversation += 'Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n';
       notifyListeners();
 
       // Prepare context for the conversation
@@ -88,8 +94,9 @@ class ChatService extends ChangeNotifier {
 
         // Filter out any content wrapped in <think></think> tags
         final filteredMessage = _filterThinkingContent(assistantMessage);
-
-        // Add the filtered response to the conversation
+        
+        // Remove the thinking message and add the real response
+        _conversation = _conversation.replaceAll('Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n', '');
         _conversation += 'Assistant: $filteredMessage\n';
         _lastResponse = filteredMessage;
 
@@ -108,6 +115,13 @@ class ChatService extends ChangeNotifier {
       return 'Sorry, I encountered an error. Please try again.';
     } finally {
       _isThinking = false;
+      
+      // Make sure the thinking message is removed in case of error
+      if (_conversation.contains('<thinking id="$_thinkingMessageId">...</thinking>')) {
+        _conversation = _conversation.replaceAll('Assistant: <thinking id="$_thinkingMessageId">...</thinking>\n', '');
+      }
+      
+      _thinkingMessageId = '';
       notifyListeners();
     }
   }

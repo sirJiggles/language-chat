@@ -67,22 +67,47 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Define our custom colors
+    const primaryColor = Color(0xFF3090cf); // Green as primary
+    const secondaryColor = Color(0xFF3090cf); // Teal as secondary
+    const tertiaryColor = Color(0xFF3090cf); // Blue as tertiary
+
     return MaterialApp(
-      title: '',
+      title: 'Language Chat',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
+        colorScheme: ColorScheme.dark(
+          primary: primaryColor,
+          secondary: secondaryColor,
+          tertiary: tertiaryColor,
+          surface: const Color(0xFF121212),
+          background: const Color(0xFF121212),
+          onPrimary: Colors.white,
+          onSecondary: Colors.black,
+          onTertiary: Colors.black,
+        ),
         useMaterial3: true,
-        textTheme: GoogleFonts.nunitoTextTheme(Theme.of(context).textTheme),
+        textTheme: GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme),
+        cardColor: const Color(0xFF1E1E1E),
+        dialogBackgroundColor: const Color(0xFF1E1E1E),
       ),
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
-        useMaterial3: true,
-        textTheme: GoogleFonts.nunitoTextTheme(
-          Theme.of(context).textTheme.apply(bodyColor: Colors.white, displayColor: Colors.white),
+        colorScheme: ColorScheme.dark(
+          primary: primaryColor,
+          secondary: secondaryColor,
+          tertiary: tertiaryColor,
+          surface: const Color(0xFF121212),
+          background: const Color(0xFF121212),
+          onPrimary: Colors.white,
+          onSecondary: Colors.black,
+          onTertiary: Colors.black,
         ),
+        useMaterial3: true,
+        textTheme: GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme),
+        cardColor: const Color(0xFF1E1E1E),
+        dialogBackgroundColor: const Color(0xFF1E1E1E),
       ),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark, // Force dark mode
       home: const ChatScreen(),
     );
   }

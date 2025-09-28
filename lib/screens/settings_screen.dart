@@ -40,6 +40,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .map((v) => (v['locale'] ?? '').split('-').first)
         .where((code) => code.isNotEmpty)
         .toSet();
+        
+    debugPrint('Available language codes: $availableCodes');
 
     String _langToCode(String lang) {
       final l = lang.toLowerCase();
@@ -99,7 +101,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _selectedVoiceName = '';
               }
             },
-            decoration: const InputDecoration(border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0), // Primary blue
+              ),
+            ),
+            dropdownColor: const Color(0xFF1E1E1E), // Dark background
+            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
           ),
           const SizedBox(height: 16),
           Text('Voice', style: Theme.of(context).textTheme.titleMedium),
