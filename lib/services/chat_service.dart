@@ -3,12 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 import '../models/message_store.dart';
+import '../models/conversation_archive.dart';
 import 'context_manager.dart';
 import 'assessment_service.dart';
 
 class ChatService extends ChangeNotifier {
   final ContextManager _contextManager;
   final AssessmentService _assessmentService;
+  final ConversationArchiveStore? _archiveStore;
   final String? _openaiApiKey;
 
   // Separate message stores for conversation and assessment
@@ -18,10 +20,12 @@ class ChatService extends ChangeNotifier {
   ChatService({
     required ContextManager contextManager,
     required AssessmentService assessmentService,
+    ConversationArchiveStore? archiveStore,
     String? openaiApiKey,
     String targetLanguage = 'German',
   }) : _contextManager = contextManager,
        _assessmentService = assessmentService,
+       _archiveStore = archiveStore,
        _openaiApiKey = openaiApiKey {
     _targetLanguage = targetLanguage;
     _conversationStore = MessageStore(name: 'conversation');
@@ -191,6 +195,45 @@ class ChatService extends ChangeNotifier {
   void clearAssessment() {
     _assessmentStore.clear();
     notifyListeners();
+  }
+
+  /// Archive current conversation and start a new one
+  Future<void> archiveAndStartNew() async {
+    // Only archive if there are messages
+    if (_conversationStore.messages.isEmpty) {
+      return;
+    }
+
+    // Create archived conversation
+    final archivedMessages = _conversationStore.messages
+        .where((m) => !m.isThinking && m.content.isNotEmpty)
+        .map((m) => ArchivedMessage(
+              content: m.content,
+              isUser: m.isUser,
+              timestamp: DateTime.now(),
+            ))
+        .toList();
+
+    if (archivedMessages.isEmpty) {
+      return;
+    }
+
+    final title = ConversationArchiveStore.generateTitle(archivedMessages);
+    final archived = ArchivedConversation(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      timestamp: DateTime.now(),
+      messages: archivedMessages,
+      title: title,
+    );
+
+    // Add to archive store
+    _archiveStore?.archiveConversation(archived);
+
+    // Clear current conversation
+    clearConversation();
+    clearAssessment();
+
+    debugPrint('Conversation archived: $title');
   }
 
   void setTargetLanguage(String lang) {

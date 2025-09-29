@@ -11,6 +11,7 @@ import 'services/assessment_service.dart';
 import 'models/settings_model.dart';
 import 'models/student_profile_store.dart';
 import 'models/language_level_tracker.dart';
+import 'models/conversation_archive.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -42,6 +43,10 @@ void main() async {
   final profileStore = StudentProfileStore();
   final levelTracker = LanguageLevelTracker();
   
+  // Create conversation archive store
+  final archiveStore = ConversationArchiveStore();
+  await archiveStore.initialize();
+
   // Connect the new stores to the context manager
   contextManager.setStores(
     profileStore: profileStore,
@@ -55,6 +60,7 @@ void main() async {
         ChangeNotifierProvider.value(value: settingsModel),
         ChangeNotifierProvider.value(value: profileStore),
         ChangeNotifierProvider.value(value: levelTracker),
+        ChangeNotifierProvider.value(value: archiveStore),
 
         // Create assessment service with new architecture
         ChangeNotifierProvider(
@@ -77,6 +83,7 @@ void main() async {
             ),
             contextManager: contextManager,
             assessmentService: Provider.of<AssessmentService>(context, listen: false),
+            archiveStore: archiveStore,
             openaiApiKey: const String.fromEnvironment(
               'OPENAI_API_KEY',
               defaultValue: '',

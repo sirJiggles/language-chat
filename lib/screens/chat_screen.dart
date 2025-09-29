@@ -5,6 +5,7 @@ import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
 import '../services/context_manager.dart';
+import '../models/conversation_archive.dart';
 import '../widgets/widgets.dart';
 import '../screens/settings_screen.dart';
 import '../debug/debug_menu.dart';
@@ -148,6 +149,12 @@ class ChatScreenState extends State<ChatScreen> {
             child: AppBar(
               backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
               elevation: 0,
+              leading: Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
               actions: [
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
@@ -160,9 +167,17 @@ class ChatScreenState extends State<ChatScreen> {
                       Navigator.of(
                         context,
                       ).push(MaterialPageRoute(builder: (_) => const DebugMenu()));
+                    } else if (value == 'new_chat') {
+                      _confirmNewChat(context);
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'new_chat',
+                      child: Row(
+                        children: [Icon(Icons.add_comment), SizedBox(width: 12), Text('New Chat')],
+                      ),
+                    ),
                     const PopupMenuItem<String>(
                       value: 'settings',
                       child: Row(
@@ -182,6 +197,7 @@ class ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ),
+      drawer: _buildDrawer(context),
       body: TiledBackground(
         assetPath: 'assets/tile.png',
         overlayOpacity: 0.2,
@@ -330,5 +346,298 @@ class ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          // Simple header with padding
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Conversations',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // New Chat button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context); // Close drawer
+                _confirmNewChat(context);
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Chat'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          const Divider(),
+          
+          // Archived chats list
+          Expanded(
+            child: Consumer<ConversationArchiveStore>(
+              builder: (context, archiveStore, _) {
+                final archives = archiveStore.archives;
+                
+                if (archives.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text(
+                        'No archived conversations yet',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+                
+                return ListView.builder(
+                  itemCount: archives.length,
+                  itemBuilder: (context, index) {
+                    final archive = archives[index];
+                    return _ArchiveListTile(
+                      archive: archive,
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        _viewArchive(context, archive);
+                      },
+                      onDelete: () => _confirmDelete(context, archiveStore, archive),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmNewChat(BuildContext context) {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    
+    // Check if there are messages to archive
+    if (chatService.conversationStore.messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No conversation to archive')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start New Chat'),
+        content: const Text(
+          'This will archive your current conversation and start a new one. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await chatService.archiveAndStartNew();
+              setState(() {
+                _botGreetingSent = false;
+              });
+              // Trigger new greeting
+              _checkForInitialAssessment();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Conversation archived. Starting new chat...')),
+              );
+            },
+            child: const Text('Start New Chat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewArchive(BuildContext context, ArchivedConversation archive) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ArchiveDetailScreen(archive: archive),
+      ),
+    );
+  }
+
+  void _confirmDelete(
+    BuildContext context,
+    ConversationArchiveStore store,
+    ArchivedConversation archive,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Conversation'),
+        content: Text('Delete "${archive.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              store.deleteConversation(archive.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Conversation deleted')),
+              );
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Archive list tile widget
+class _ArchiveListTile extends StatelessWidget {
+  final ArchivedConversation archive;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _ArchiveListTile({
+    required this.archive,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = _formatDate(archive.timestamp);
+    
+    return ListTile(
+      leading: const Icon(Icons.chat_bubble_outline, size: 20),
+      title: Text(
+        archive.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 14),
+      ),
+      subtitle: Text(
+        '$dateStr • ${archive.messages.length} messages',
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline, size: 20),
+        onPressed: onDelete,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      onTap: onTap,
+      dense: true,
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    
+    if (diff.inDays == 0) {
+      return 'Today';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}d ago';
+    } else {
+      return '${date.month}/${date.day}';
+    }
+  }
+}
+
+// Archive detail screen
+class _ArchiveDetailScreen extends StatelessWidget {
+  final ArchivedConversation archive;
+
+  const _ArchiveDetailScreen({required this.archive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(archive.title),
+      ),
+      body: Column(
+        children: [
+          // Header with date
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16.0),
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatDetailDate(archive.timestamp),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${archive.messages.length} messages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Messages
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: archive.messages.length,
+              itemBuilder: (context, index) {
+                final message = archive.messages[index];
+                return ChatBubble(
+                  message: message.content,
+                  isUser: message.isUser,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDetailDate(DateTime date) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final amPm = date.hour >= 12 ? 'PM' : 'AM';
+    return '${months[date.month - 1]} ${date.day}, ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
   }
 }
