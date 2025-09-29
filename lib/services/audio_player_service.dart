@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 class AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
   Function? _onPlaybackComplete;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
   
   bool get isPlaying => _player.playing;
   
@@ -31,11 +33,11 @@ class AudioPlayerService {
       final tempFile = await _saveBytesToTempFile(bytes);
       debugPrint('AudioPlayerService: Saved audio to temporary file: ${tempFile.path}');
       
-      // Remove any existing listeners to avoid duplicates
-      _player.playerStateStream.drain();
+      // Cancel any existing subscription
+      await _playerStateSubscription?.cancel();
       
       // Set up completion listener
-      _player.playerStateStream.listen((state) {
+      _playerStateSubscription = _player.playerStateStream.listen((state) {
         debugPrint('AudioPlayerService: Player state changed: ${state.processingState}, playing=${state.playing}');
         if (state.processingState == ProcessingState.completed) {
           debugPrint('AudioPlayerService: Audio playback completed');
@@ -63,6 +65,8 @@ class AudioPlayerService {
   Future<void> stop() async {
     debugPrint('AudioPlayerService: stop method called, isPlaying=${_player.playing}');
     try {
+      await _playerStateSubscription?.cancel();
+      _playerStateSubscription = null;
       await _player.stop();
       debugPrint('AudioPlayerService: Player stopped');
     } catch (e) {
@@ -80,6 +84,7 @@ class AudioPlayerService {
   
   /// Dispose resources
   Future<void> dispose() async {
+    await _playerStateSubscription?.cancel();
     await _player.dispose();
   }
 }

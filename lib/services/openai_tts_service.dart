@@ -25,21 +25,23 @@ class OpenAITtsService {
   ];
 
   OpenAITtsService({required String apiKey}) : _apiKey = apiKey {
+    debugPrint('OpenAI TTS: Service initialized');
     // Set up audio player completion callback
-    _audioPlayer.onPlaybackComplete = () {
-      debugPrint('OpenAI TTS: Audio playback completed callback triggered');
-      _isSpeaking = false;
-      debugPrint('OpenAI TTS: Set isSpeaking=false');
-      
-      // Notify listeners if callback is set
-      if (_onPlaybackComplete != null) {
-        debugPrint('OpenAI TTS: Calling onPlaybackComplete callback');
-        _onPlaybackComplete!();
-      } else {
-        debugPrint('OpenAI TTS: No onPlaybackComplete callback set');
-      }
-    };
-    debugPrint('OpenAI TTS: Service initialized with completion callback');
+    _audioPlayer.onPlaybackComplete = _handlePlaybackComplete;
+  }
+  
+  void _handlePlaybackComplete() {
+    debugPrint('OpenAI TTS: Audio playback completed callback triggered');
+    _isSpeaking = false;
+    debugPrint('OpenAI TTS: Set isSpeaking=false');
+    
+    // Notify listeners if callback is set
+    if (_onPlaybackComplete != null) {
+      debugPrint('OpenAI TTS: Calling onPlaybackComplete callback');
+      _onPlaybackComplete!();
+    } else {
+      debugPrint('OpenAI TTS: No onPlaybackComplete callback set');
+    }
   }
 
   bool get isSpeaking => _isSpeaking;

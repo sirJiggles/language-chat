@@ -16,13 +16,25 @@ class MicButton extends StatefulWidget {
   State<MicButton> createState() => _MicButtonState();
 }
 
-class _MicButtonState extends State<MicButton> {
+class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMixin {
   bool _cancelRecording = false;
   bool _isSpeaking = false;
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
   
   @override
   void initState() {
     super.initState();
+    
+    // Initialize scale animation
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
+    );
+    
     // Schedule a post-frame callback to add the TTS listener
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _addTtsListener();
@@ -34,6 +46,7 @@ class _MicButtonState extends State<MicButton> {
     // Remove the TTS listener when disposing
     final ttsService = Provider.of<TtsService>(context, listen: false);
     ttsService.removeListener(_onTtsStateChanged);
+    _scaleController.dispose();
     super.dispose();
   }
   
@@ -59,10 +72,7 @@ class _MicButtonState extends State<MicButton> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child: Consumer3<SpeechService, ChatService, TtsService>(
+    return Consumer3<SpeechService, ChatService, TtsService>(
           builder: (context, speechService, chatService, ttsService, _) {
             final isListening = speechService.isListening;
             final isSpeaking = ttsService.isSpeaking;
@@ -73,20 +83,16 @@ class _MicButtonState extends State<MicButton> {
             // Use our local state for more reliable UI updates
             final bgColor = isListening
                 ? (_cancelRecording
-                      ? Colors.grey.shade400.withOpacity(0.8)
-                      : Theme.of(context).colorScheme.primary.withOpacity(0.8))
-                : (_isSpeaking ? Theme.of(context).colorScheme.primary.withOpacity(0.8) : Colors.transparent);
-            final borderColor = isListening
-                ? (_cancelRecording ? Colors.grey.withOpacity(0.9) : Theme.of(context).colorScheme.primary.withOpacity(0.9))
-                : (_isSpeaking
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.9)
-                      : Theme.of(context).colorScheme.primary.withOpacity(0.8));
-            final iconColor = (isListening || _isSpeaking)
-                ? Colors.white
-                : Theme.of(context).colorScheme.primary;
+                      ? Colors.grey.shade400
+                      : Theme.of(context).colorScheme.primary)
+                : (_isSpeaking ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary);
+            final iconColor = Colors.white;
 
             return GestureDetector(
               onTapDown: (_) async {
+                // Scale up the button
+                _scaleController.forward();
+                
                 if (isSpeaking) {
                   await ttsService.stop();
                   return;
@@ -99,6 +105,9 @@ class _MicButtonState extends State<MicButton> {
                 }
               },
               onTapUp: (_) async {
+                // Scale down the button
+                _scaleController.reverse();
+                
                 if (isSpeaking) {
                   await ttsService.stop();
                   return;
@@ -155,6 +164,9 @@ class _MicButtonState extends State<MicButton> {
                 }
               },
               onTapCancel: () async {
+                // Scale down the button
+                _scaleController.reverse();
+                
                 if (isSpeaking) {
                   await ttsService.stop();
                   return;
@@ -187,53 +199,63 @@ class _MicButtonState extends State<MicButton> {
               onPanEnd: (_) async {
                 // Do nothing here; final handling occurs onTapUp
               },
-              child: Container(
-                width: 80, // Slightly smaller
-                height: 80, // Slightly smaller
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: borderColor, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Show sound wave animation when bot is talking, otherwise show mic icon
-                    _isSpeaking 
-                      ? SoundWaveAnimation(
-                          color: Colors.white,
-                          size: 48,
-                          barCount: 9,
-                          barWidth: 2.0,
-                          barSpacing: 2.0,
-                          minBarHeight: 2.0,
-                          maxBarHeight: 18.0,
-                          animationDuration: const Duration(milliseconds: 200),
-                        )
-                      : Icon(
-                          isListening ? Icons.mic : Icons.mic_none,
-                          size: 32, // Slightly smaller
-                          color: iconColor,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                  // Adapt size based on available space
+                  final size = constraints.maxWidth > 0 && constraints.maxWidth < 60 
+                      ? constraints.maxWidth 
+                      : 80.0;
+                  final iconSize = size * 0.4;
+                  
+                  return Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
-                    if (_cancelRecording && isListening)
-                      const Positioned(
-                        bottom: 10,
-                        child: Icon(Icons.cancel, size: 18, color: Colors.white),
-                      ),
-                  ],
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Show sound wave animation when bot is talking, otherwise show mic icon
+                        _isSpeaking 
+                          ? SoundWaveAnimation(
+                              color: Colors.white,
+                              size: size * 0.6,
+                              barCount: size > 60 ? 9 : 5,
+                              barWidth: size > 60 ? 2.0 : 1.5,
+                              barSpacing: size > 60 ? 2.0 : 1.5,
+                              minBarHeight: 2.0,
+                              maxBarHeight: size > 60 ? 18.0 : 12.0,
+                              animationDuration: const Duration(milliseconds: 200),
+                            )
+                          : Icon(
+                              Icons.mic,
+                              size: iconSize,
+                              color: iconColor,
+                            ),
+                        if (_cancelRecording && isListening && size > 60)
+                          Positioned(
+                            bottom: size * 0.125,
+                            child: Icon(Icons.cancel, size: size * 0.225, color: Colors.white),
+                          ),
+                      ],
+                    ),
+                  );
+                },
                 ),
               ),
             );
           },
-        ),
-      ),
-    );
+        );
   }
 }

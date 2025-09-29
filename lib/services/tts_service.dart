@@ -14,7 +14,7 @@ class AudioCacheEntry {
   final Uint8List audioData;
   final DateTime timestamp;
   final String voice;
-  
+
   AudioCacheEntry({
     required this.text,
     required this.audioData,
@@ -29,20 +29,20 @@ class TtsService extends ChangeNotifier {
   final SettingsModel _settingsModel;
   bool _isSpeaking = false;
   String? _lastSpokenText;
-  
+
   // Audio cache - stores the last 5 messages
   final int _maxCacheSize = 5;
   final Map<String, AudioCacheEntry> _audioCache = {};
-  
+
   // Get a sorted list of cache entries (most recent first)
-  List<AudioCacheEntry> get cachedEntries => 
+  List<AudioCacheEntry> get cachedEntries =>
       _audioCache.values.sorted((a, b) => b.timestamp.compareTo(a.timestamp)).toList();
-  
+
   /// Add an entry to the audio cache
   void _addToCache(String text, Uint8List audioData, String voice) {
     // Create a normalized key for the cache (lowercase, trimmed)
     final key = text.trim().toLowerCase();
-    
+
     // Add or update the cache entry
     _audioCache[key] = AudioCacheEntry(
       text: text,
@@ -50,22 +50,24 @@ class TtsService extends ChangeNotifier {
       timestamp: DateTime.now(),
       voice: voice,
     );
-    
+
     // Enforce the cache size limit (LRU policy)
     _enforceCacheLimit();
-    
-    debugPrint('TTS Service: Added "${text.substring(0, text.length > 20 ? 20 : text.length)}..." to audio cache');
+
+    debugPrint(
+      'TTS Service: Added "${text.substring(0, text.length > 20 ? 20 : text.length)}..." to audio cache',
+    );
     debugPrint('TTS Service: Cache now contains ${_audioCache.length} entries');
   }
-  
+
   /// Get an entry from the audio cache if available
   AudioCacheEntry? _getFromCache(String text) {
     // Create a normalized key for the cache (lowercase, trimmed)
     final key = text.trim().toLowerCase();
-    
+
     // Check if the entry exists in the cache
     final entry = _audioCache[key];
-    
+
     if (entry != null) {
       // Update the timestamp to mark it as recently used
       _audioCache[key] = AudioCacheEntry(
@@ -74,38 +76,45 @@ class TtsService extends ChangeNotifier {
         timestamp: DateTime.now(),
         voice: entry.voice,
       );
-      
-      debugPrint('TTS Service: Cache hit for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
+
+      debugPrint(
+        'TTS Service: Cache hit for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."',
+      );
       return entry;
     }
-    
-    debugPrint('TTS Service: Cache miss for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
+
+    debugPrint(
+      'TTS Service: Cache miss for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."',
+    );
     return null;
   }
-  
+
   /// Enforce the cache size limit using LRU policy
   void _enforceCacheLimit() {
     if (_audioCache.length <= _maxCacheSize) return;
-    
+
     // Sort entries by timestamp (oldest first)
     final sortedEntries = cachedEntries.reversed.toList();
-    
+
     // Remove oldest entries until we're back at the limit
     while (_audioCache.length > _maxCacheSize) {
       final oldestEntry = sortedEntries.removeAt(0);
       final keyToRemove = oldestEntry.text.trim().toLowerCase();
       _audioCache.remove(keyToRemove);
-      debugPrint('TTS Service: Removed oldest cache entry: "${oldestEntry.text.substring(0, oldestEntry.text.length > 20 ? 20 : oldestEntry.text.length)}..."');
+      debugPrint(
+        'TTS Service: Removed oldest cache entry: "${oldestEntry.text.substring(0, oldestEntry.text.length > 20 ? 20 : oldestEntry.text.length)}..."',
+      );
     }
   }
-  
+
   /// Clear the audio cache
   void clearCache() {
     _audioCache.clear();
     debugPrint('TTS Service: Audio cache cleared');
   }
-  
-  TtsService({required SettingsModel settingsModel, String? openaiApiKey}) : _settingsModel = settingsModel {
+
+  TtsService({required SettingsModel settingsModel, String? openaiApiKey})
+    : _settingsModel = settingsModel {
     // Initialize OpenAI TTS if API key is provided
     if (openaiApiKey != null && openaiApiKey.isNotEmpty) {
       _openAITts = OpenAITtsService(apiKey: openaiApiKey);
@@ -113,7 +122,7 @@ class TtsService extends ChangeNotifier {
         _openAITts!.setVoice(_settingsModel.openaiTtsVoice);
       }
       _openAIVoices = _openAITts!.voices;
-      
+
       // Set up completion callback
       _openAITts!.onPlaybackComplete = () {
         _isSpeaking = false;
@@ -127,14 +136,17 @@ class TtsService extends ChangeNotifier {
   }
 
   // Env-driven defaults
-  static const String _envTargetLanguage = String.fromEnvironment('TARGET_LANGUAGE', defaultValue: 'Spanish');
-  
+  static const String _envTargetLanguage = String.fromEnvironment(
+    'TARGET_LANGUAGE',
+    defaultValue: 'Spanish',
+  );
+
   // Runtime-updatable settings
   String _voiceName = '';
   String _preferredLanguage = _envTargetLanguage;
   List<Map<String, String>> _availableVoices = const [];
   final Map<String, String> _preferredVoicesByLang = {}; // langCode -> voiceName
-  
+
   // OpenAI TTS settings
   List<Map<String, String>> _openAIVoices = const [];
 
@@ -153,19 +165,19 @@ class TtsService extends ChangeNotifier {
   Future<void> initialize() async {
     // Load saved settings
     await _loadSettings();
-    
+
     // Initialize OpenAI TTS if API key is provided
     if (_settingsModel.ttsProvider == TtsProvider.openai) {
       _initializeOpenAITts();
     }
-    
+
     // Pick a suitable locale (language-region) based on TARGET_LANGUAGE
     final locale = _mapTargetLanguageToLocale(_preferredLanguage);
 
     // Set basic params
     await _flutterTts.setLanguage(locale);
     await _flutterTts.setSpeechRate(0.5); // Fixed rate
-    await _flutterTts.setPitch(1.0);      // Fixed pitch
+    await _flutterTts.setPitch(1.0); // Fixed pitch
     await _flutterTts.setVolume(1.0);
 
     // Try to select a high-quality voice automatically
@@ -178,15 +190,15 @@ class TtsService extends ChangeNotifier {
           try {
             final mv = Map<String, dynamic>.from(v as Map);
             final voiceMap = <String, String>{};
-            
+
             if (mv['name'] != null) {
               voiceMap['name'] = mv['name'].toString();
             }
-            
+
             if (mv['locale'] != null) {
               voiceMap['locale'] = mv['locale'].toString();
             }
-            
+
             if (voiceMap.isNotEmpty) {
               tempVoices.add(voiceMap);
             }
@@ -214,16 +226,16 @@ class TtsService extends ChangeNotifier {
         if (selected != null) {
           try {
             final voiceMap = <String, String>{};
-            
+
             if (selected['name'] != null) {
               voiceMap['name'] = selected['name'].toString();
               _voiceName = selected['name'].toString();
             }
-            
+
             if (selected['locale'] != null) {
               voiceMap['locale'] = selected['locale'].toString();
             }
-            
+
             if (voiceMap.isNotEmpty) {
               await _flutterTts.setVoice(voiceMap);
             }
@@ -284,7 +296,7 @@ class TtsService extends ChangeNotifier {
       debugPrint('TTS Service: Empty text, not speaking');
       return;
     }
-    
+
     // Skip if already speaking
     if (_isSpeaking) {
       debugPrint('TTS Service: Already speaking, stopping first');
@@ -302,24 +314,21 @@ class TtsService extends ChangeNotifier {
     // Clean up text for better TTS
     final cleanText = _stripEmojis(text);
     debugPrint('TTS Service: Speaking cleaned text of length ${cleanText.length}');
-    
+
     _lastSpokenText = cleanText;
     _isSpeaking = true;
     debugPrint('TTS Service: Set isSpeaking=true and notifying listeners');
-    // Make sure to notify on the main thread
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
-    
+    notifyListeners();
+
     try {
       // Use OpenAI TTS if selected and available
       if (_settingsModel.ttsProvider == TtsProvider.openai && _openAITts != null) {
         debugPrint('TTS Service: Using OpenAI TTS provider');
-        
+
         // Check if we have this text in the cache
         final cachedEntry = _getFromCache(cleanText);
         final currentVoice = _settingsModel.openaiTtsVoice;
-        
+
         if (cachedEntry != null && cachedEntry.voice == currentVoice) {
           // Use cached audio data
           debugPrint('TTS Service: Using cached audio data');
@@ -328,7 +337,7 @@ class TtsService extends ChangeNotifier {
           // Generate new audio
           debugPrint('TTS Service: Generating new audio');
           final audioData = await _openAITts!.speak(cleanText);
-          
+
           // Cache the audio data if available
           if (audioData != null) {
             _addToCache(cleanText, audioData, currentVoice);
@@ -343,13 +352,10 @@ class TtsService extends ChangeNotifier {
     } catch (e) {
       debugPrint('TTS Service: Error speaking text: $e');
       _isSpeaking = false;
-      // Make sure to notify on the main thread
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        notifyListeners();
-      });
+      notifyListeners();
     }
   }
-  
+
   // Helper methods are defined at the bottom of the class
 
   Future<void> stop() async {
@@ -364,10 +370,7 @@ class TtsService extends ChangeNotifier {
       }
       _isSpeaking = false;
       debugPrint('TTS Service: Set isSpeaking=false and notifying listeners');
-      // Make sure to notify on the main thread
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        notifyListeners();
-      });
+      notifyListeners();
     } else {
       debugPrint('TTS Service: Not speaking, no need to stop');
     }
@@ -381,14 +384,14 @@ class TtsService extends ChangeNotifier {
   }
 
   // ----------------------- helpers -----------------------
-  
+
   void _initializeOpenAITts() {
     // If OpenAI TTS is already initialized, just update the voice
     if (_openAITts != null) {
       _openAITts!.setVoice(_settingsModel.openaiTtsVoice);
       return;
     }
-    
+
     // Otherwise try to initialize with environment variable
     final apiKey = const String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
     if (apiKey.isNotEmpty) {
@@ -399,17 +402,17 @@ class TtsService extends ChangeNotifier {
       debugPrint('Warning: OpenAI TTS provider selected but no API key available');
     }
   }
-  
+
   void setTtsProvider(TtsProvider provider) {
     _settingsModel.setTtsProvider(provider);
-    
+
     if (provider == TtsProvider.openai && _openAITts == null) {
       _initializeOpenAITts();
     }
-    
+
     notifyListeners();
   }
-  
+
   void setOpenAIVoice(String voiceId) {
     _settingsModel.setOpenAITtsVoice(voiceId);
     if (_openAITts != null) {
@@ -417,7 +420,7 @@ class TtsService extends ChangeNotifier {
     }
     notifyListeners();
   }
-  
+
   List<Map<String, String>> get openAIVoices => _openAIVoices;
   void setVoiceName(String name) {
     _voiceName = name;
@@ -459,7 +462,7 @@ class TtsService extends ChangeNotifier {
         debugPrint('Initializing OpenAI TTS for preview');
         _initializeOpenAITts();
       }
-      
+
       if (_openAITts != null) {
         debugPrint('Previewing OpenAI voice: $voiceName');
         _openAITts!.setVoice(voiceName);
@@ -474,7 +477,7 @@ class TtsService extends ChangeNotifier {
       await _flutterTts.speak('This is a preview.');
     }
   }
-  
+
   String _mapTargetLanguageToLocale(String language) {
     final l = language.toLowerCase();
     if (l.startsWith('spanish') || l.startsWith('es')) return 'es-ES';
@@ -498,7 +501,7 @@ class TtsService extends ChangeNotifier {
 
   Future<void> _applyVoiceByName(String name) async {
     if (name.isEmpty) return;
-    
+
     try {
       // Find the voice by name
       Map<String, String>? match;
@@ -508,9 +511,9 @@ class TtsService extends ChangeNotifier {
           break;
         }
       }
-      
+
       if (match == null || match.isEmpty) return;
-      
+
       // Create a new mutable map to avoid unmodifiable collection issues
       final voiceMap = <String, String>{};
       if (match.containsKey('name') && match['name'] != null) {
@@ -519,7 +522,7 @@ class TtsService extends ChangeNotifier {
       if (match.containsKey('locale') && match['locale'] != null) {
         voiceMap['locale'] = match['locale']!;
       }
-      
+
       if (voiceMap.isNotEmpty) {
         await _flutterTts.setVoice(voiceMap);
       }
@@ -554,19 +557,19 @@ class TtsService extends ChangeNotifier {
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Load voice name
       final savedVoiceName = prefs.getString(_keyVoiceName);
       if (savedVoiceName != null && savedVoiceName.isNotEmpty) {
         _voiceName = savedVoiceName;
       }
-      
+
       // Load preferred language
       final savedLanguage = prefs.getString(_keyPreferredLanguage);
       if (savedLanguage != null && savedLanguage.isNotEmpty) {
         _preferredLanguage = savedLanguage;
       }
-      
+
       // Load preferred voices by language
       final savedVoicesByLang = prefs.getString(_keyPreferredVoicesByLang);
       if (savedVoicesByLang != null && savedVoicesByLang.isNotEmpty) {
@@ -582,27 +585,27 @@ class TtsService extends ChangeNotifier {
           debugPrint('Error parsing saved voices by language: $e');
         }
       }
-      
+
       debugPrint('Loaded TTS settings from preferences');
     } catch (e) {
       debugPrint('Error loading TTS settings: $e');
     }
   }
-  
+
   // Save settings to shared preferences
   Future<void> _saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Save voice name
       await prefs.setString(_keyVoiceName, _voiceName);
-      
+
       // Save preferred language
       await prefs.setString(_keyPreferredLanguage, _preferredLanguage);
-      
+
       // Save preferred voices by language
       await prefs.setString(_keyPreferredVoicesByLang, jsonEncode(_preferredVoicesByLang));
-      
+
       debugPrint('Saved TTS settings to preferences');
     } catch (e) {
       debugPrint('Error saving TTS settings: $e');

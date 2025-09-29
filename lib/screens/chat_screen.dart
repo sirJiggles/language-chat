@@ -18,6 +18,7 @@ class ChatScreen extends StatefulWidget {
 class ChatScreenState extends State<ChatScreen> {
   bool _botGreetingSent = false;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _textController = TextEditingController();
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
@@ -96,12 +97,38 @@ class ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _sendTextMessage() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+
+    // Clear the text field
+    _textController.clear();
+
+    // Send the message
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    
+    final response = await chatService.sendMessage(text);
+
+    // Speak the response
+    try {
+      final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
+      await ttsService.speak(cleanResponse);
+    } catch (e) {
+      debugPrint('Error speaking response: $e');
+    }
+
+    // Auto-scroll to bottom
+    _scrollToBottom();
+  }
+
   @override
   void dispose() {
     // Remove listener when disposing
     final chatService = Provider.of<ChatService>(context, listen: false);
     chatService.removeListener(_handleChatServiceUpdate);
     _scrollController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -109,43 +136,69 @@ class ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     // Get the bottom safe area height
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    // Height for the controls area (adjust as needed)
-    final controlsHeight = 160.0 + bottomPadding;
 
     return Scaffold(
-      // No AppBar to maximize space for chat content
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (value == 'debug') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DebugMenu()),
+                );
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings),
+                    SizedBox(width: 12),
+                    Text('Settings'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'debug',
+                child: Row(
+                  children: [
+                    Icon(Icons.bug_report),
+                    SizedBox(width: 12),
+                    Text('Debug Menu'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: TiledBackground(
         assetPath: 'assets/tile.png',
-        overlayOpacity: 0.2, // Lighter overlay to see more of the tile pattern
-        child: Stack(
+        overlayOpacity: 0.2,
+        child: Column(
           children: [
-            // Main chat content - full screen with padding at bottom for controls
-            Positioned.fill(
+            // Main chat content
+            Expanded(
               child: Consumer<ChatService>(
                 builder: (context, chatService, _) {
-                  // Use the message store for conversation
                   final messages = chatService.conversationStore.messages;
 
                   if (messages.isNotEmpty) {
-                    // First check if there's a thinking message that should be shown
                     final thinkingMessages = messages.where((msg) => msg.isThinking).toList();
                     final isThinking = thinkingMessages.isNotEmpty || chatService.isThinking;
                     
-                    // Debug thinking state
-                    debugPrint('Chat screen thinking state: ${thinkingMessages.length} thinking messages, chatService.isThinking=${chatService.isThinking}');
-                    
-                    // Filter out thinking messages but keep regular bot messages
                     final visibleMessages = messages.where((msg) => 
                       !msg.isThinking &&
                       !msg.content.contains('<thinking id=') &&
                       msg.content.isNotEmpty
                     ).toList();
-                    
-                    // Debug what messages are being filtered
-                    debugPrint('Total messages: ${messages.length}, Visible messages: ${visibleMessages.length}');
-                    for (var i = 0; i < messages.length; i++) {
-                      debugPrint('Message $i: ${messages[i].source}, isThinking: ${messages[i].isThinking}, content: ${messages[i].content.substring(0, messages[i].content.length > 20 ? 20 : messages[i].content.length)}...');
-                    }
                     
                     // Schedule a scroll to bottom after the UI updates
                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -154,13 +207,10 @@ class ChatScreenState extends State<ChatScreen> {
                     
                     return ListView.builder(
                       controller: _scrollController,
-                      // Add padding at the bottom to ensure messages aren't hidden behind controls
-                      padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, controlsHeight),
+                      padding: const EdgeInsets.all(16.0),
                       itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                       itemBuilder: (context, index) {
-                        // Show thinking bubble as the last item if we're in thinking state
                         if (isThinking && index == visibleMessages.length) {
-                          debugPrint('Rendering thinking bubble');
                           return const ThinkingBubble();
                         }
                         
@@ -169,7 +219,6 @@ class ChatScreenState extends State<ChatScreen> {
                       },
                     );
                   } else {
-                    // Show loading message while bot is preparing greeting
                     return Consumer<ContextManager>(
                       builder: (context, contextManager, _) {
                         if (!_botGreetingSent) {
@@ -203,76 +252,55 @@ class ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-            // Bottom controls container with frosted glass effect
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  // Add a subtle shadow at the top of the controls area
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: FrostedGlass(
-                  blurAmount: 5.0,
-                  tintColor: const Color.fromARGB(255, 37, 37, 37),
-                  tintOpacity: 0.8,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Live transcription preview
-                        const TranscriptionPreview(cancelRecording: false),
-                        // Bottom row with mic button and nav buttons
-                        Row(
-                          children: [
-                            // Settings button
-                            IconButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  context,
-                                ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                              },
-                              icon: Icon(
-                                Icons.settings,
-                                color: Theme.of(context).colorScheme.tertiary.withOpacity(0.8),
-                                size: 26,
-                              ),
-                              tooltip: 'Settings',
-                            ),
-                            // Microphone button (centered)
-                            Expanded(child: MicButton(onScrollToBottom: _scrollToBottom)),
-                            // Debug button
-                            IconButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  context,
-                                ).push(MaterialPageRoute(builder: (_) => const DebugMenu()));
-                              },
-                              icon: Icon(
-                                Icons.bug_report,
-                                color: Theme.of(context).colorScheme.tertiary.withOpacity(0.8),
-                                size: 26,
-                              ),
-                              tooltip: 'Debug Menu',
-                            ),
-                          ],
+            // Live transcription preview
+            const TranscriptionPreview(cancelRecording: false),
+
+            // WhatsApp-style bottom input area
+            Container(
+              padding: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, bottomPadding + 8.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Text input field
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _textController,
+                        style: const TextStyle(color: Colors.black87),
+                        decoration: const InputDecoration(
+                          hintText: 'Message',
+                          hintStyle: TextStyle(color: Colors.black38),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                         ),
-                      ],
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendTextMessage(),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Mic button - smaller and without background
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: MicButton(onScrollToBottom: _scrollToBottom),
+                  ),
+                ],
               ),
             ),
           ],
