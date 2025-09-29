@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../database/repositories/assessment_repository.dart';
+import '../database/models/assessment_db.dart';
 
-/// Tracks the student's language level over time based on conversation analysis
+/// Tracks the student's language level over time based on conversation analysis (now using Isar)
 class LanguageLevelTracker extends ChangeNotifier {
+  final AssessmentRepository _repository = AssessmentRepository();
+  
   // Current estimated CEFR level
   String _currentLevel = 'A1';
   
@@ -16,17 +20,35 @@ class LanguageLevelTracker extends ChangeNotifier {
   // Last assessment timestamp
   DateTime? _lastAssessment;
   
-  // Storage keys
-  static const String _keyCurrentLevel = 'language_level_current';
-  static const String _keyHistory = 'language_level_history';
-  static const String _keyConfidence = 'language_level_confidence';
-  static const String _keyLastAssessment = 'language_level_last_assessment';
+  // Legacy storage keys for migration
+  static const String _legacyKeyCurrentLevel = 'language_level_current';
+  static const String _legacyKeyHistory = 'language_level_history';
+  static const String _legacyKeyConfidence = 'language_level_confidence';
+  static const String _legacyKeyLastAssessment = 'language_level_last_assessment';
   
   // CEFR levels in order
   static const List<String> cefrLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
   
-  LanguageLevelTracker() {
-    _loadData();
+  bool _isInitialized = false;
+  
+  bool get isInitialized => _isInitialized;
+  
+  /// Initialize and load data from database
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    
+    try {
+      // Migrate from SharedPreferences if needed
+      await _migrateFromSharedPreferences();
+      
+      // Load from Isar
+      await _loadData();
+      
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('Error initializing LanguageLevelTracker: $e');
+      _isInitialized = true;
+    }
   }
   
   /// Get current level
@@ -92,8 +114,26 @@ class LanguageLevelTracker extends ChangeNotifier {
       _levelHistory.removeAt(0);
     }
     
-    await _saveData();
+    // Save to Isar
+    await _saveToDatabase(assessment);
     notifyListeners();
+  }
+  
+  /// Save assessment to database
+  Future<void> _saveToDatabase(LevelAssessment assessment) async {
+    try {
+      // Save to level history
+      final historyDB = LevelHistoryDB()
+        ..timestamp = assessment.timestamp
+        ..level = assessment.level
+        ..confidence = assessment.confidence
+        ..reasoning = assessment.reasoning;
+      
+      await _repository.saveLevelHistory(historyDB);
+      debugPrint('Saved level assessment to Isar: ${assessment.level}');
+    } catch (e) {
+      debugPrint('Error saving assessment to database: $e');
+    }
   }
   
   /// Calculate confidence based on recent assessment consistency
@@ -176,59 +216,69 @@ class LanguageLevelTracker extends ChangeNotifier {
     _levelHistory.clear();
     _confidence = 0.5;
     _lastAssessment = null;
-    await _saveData();
+    await _repository.deleteAllLevelHistory();
     notifyListeners();
   }
   
-  /// Load data from persistent storage
-  Future<void> _loadData() async {
+  /// Migrate from SharedPreferences to Isar
+  Future<void> _migrateFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      _currentLevel = prefs.getString(_keyCurrentLevel) ?? 'A1';
-      _confidence = prefs.getDouble(_keyConfidence) ?? 0.5;
-      
-      final lastAssessmentStr = prefs.getString(_keyLastAssessment);
-      if (lastAssessmentStr != null) {
-        _lastAssessment = DateTime.parse(lastAssessmentStr);
-      }
-      
-      final historyJson = prefs.getString(_keyHistory);
+      // Check if legacy data exists
+      final historyJson = prefs.getString(_legacyKeyHistory);
       if (historyJson != null) {
+        debugPrint('Found legacy level history in SharedPreferences, migrating to Isar...');
         final List<dynamic> decoded = jsonDecode(historyJson);
-        _levelHistory.clear();
-        _levelHistory.addAll(
-          decoded.map((item) => LevelAssessment.fromJson(item as Map<String, dynamic>)),
-        );
+        
+        for (final item in decoded) {
+          final assessment = LevelAssessment.fromJson(item as Map<String, dynamic>);
+          final historyDB = LevelHistoryDB()
+            ..timestamp = assessment.timestamp
+            ..level = assessment.level
+            ..confidence = assessment.confidence
+            ..reasoning = assessment.reasoning;
+          
+          await _repository.saveLevelHistory(historyDB);
+        }
+        
+        debugPrint('Migrated ${decoded.length} level assessments to Isar');
+        
+        // Remove from SharedPreferences after successful migration
+        await prefs.remove(_legacyKeyCurrentLevel);
+        await prefs.remove(_legacyKeyHistory);
+        await prefs.remove(_legacyKeyConfidence);
+        await prefs.remove(_legacyKeyLastAssessment);
       }
-      
-      debugPrint('Loaded language level: $_currentLevel (confidence: ${(_confidence * 100).toStringAsFixed(0)}%)');
-      notifyListeners();
     } catch (e) {
-      debugPrint('Error loading language level data: $e');
+      debugPrint('Error migrating level history from SharedPreferences: $e');
     }
   }
   
-  /// Save data to persistent storage
-  Future<void> _saveData() async {
+  /// Load data from Isar database
+  Future<void> _loadData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final historyDB = await _repository.getAllLevelHistory();
       
-      await prefs.setString(_keyCurrentLevel, _currentLevel);
-      await prefs.setDouble(_keyConfidence, _confidence);
+      _levelHistory.clear();
+      _levelHistory.addAll(historyDB.map((db) => LevelAssessment(
+        level: db.level,
+        reasoning: db.reasoning,
+        timestamp: db.timestamp,
+        confidence: db.confidence,
+      )));
       
-      if (_lastAssessment != null) {
-        await prefs.setString(_keyLastAssessment, _lastAssessment!.toIso8601String());
+      // Set current level from most recent assessment
+      if (_levelHistory.isNotEmpty) {
+        _currentLevel = _levelHistory.last.level;
+        _lastAssessment = _levelHistory.last.timestamp;
+        _updateConfidence();
       }
       
-      final historyJson = jsonEncode(
-        _levelHistory.map((a) => a.toJson()).toList(),
-      );
-      await prefs.setString(_keyHistory, historyJson);
-      
-      debugPrint('Saved language level data');
+      debugPrint('Loaded language level from Isar: $_currentLevel (${_levelHistory.length} assessments)');
+      notifyListeners();
     } catch (e) {
-      debugPrint('Error saving language level data: $e');
+      debugPrint('Error loading language level data: $e');
     }
   }
 }

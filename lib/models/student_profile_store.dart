@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../database/repositories/student_fact_repository.dart';
 
 /// Store for student profile data - personal facts about the student
-/// that help personalize conversations
+/// that help personalize conversations (now using Isar database)
 class StudentProfileStore extends ChangeNotifier {
-  // Key-value store for student facts
+  final StudentFactRepository _repository = StudentFactRepository();
+  
+  // In-memory cache of profile data
   final Map<String, dynamic> _profile = {};
   
   // Predefined categories for organization
@@ -15,11 +18,29 @@ class StudentProfileStore extends ChangeNotifier {
   static const String categoryWork = 'work';
   static const String categoryOther = 'other';
   
-  // Storage key
-  static const String _storageKey = 'student_profile';
+  // Legacy storage key for migration
+  static const String _legacyStorageKey = 'student_profile';
   
-  StudentProfileStore() {
-    _loadProfile();
+  bool _isInitialized = false;
+  
+  bool get isInitialized => _isInitialized;
+  
+  /// Initialize and load profile from database
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    
+    try {
+      // Migrate from SharedPreferences if needed
+      await _migrateFromSharedPreferences();
+      
+      // Load from Isar
+      await _loadProfile();
+      
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('Error initializing StudentProfileStore: $e');
+      _isInitialized = true;
+    }
   }
   
   /// Get all profile data
@@ -31,28 +52,30 @@ class StudentProfileStore extends ChangeNotifier {
   /// Set a value in the profile
   Future<void> setValue(String key, dynamic value) async {
     _profile[key] = value;
-    await _saveProfile();
+    await _repository.saveFact(key, value.toString());
     notifyListeners();
   }
   
   /// Set multiple values at once
   Future<void> setValues(Map<String, dynamic> values) async {
     _profile.addAll(values);
-    await _saveProfile();
+    for (final entry in values.entries) {
+      await _repository.saveFact(entry.key, entry.value.toString());
+    }
     notifyListeners();
   }
   
   /// Remove a value from the profile
   Future<void> removeValue(String key) async {
     _profile.remove(key);
-    await _saveProfile();
+    await _repository.deleteByKey(key);
     notifyListeners();
   }
   
   /// Clear all profile data
   Future<void> clearProfile() async {
     _profile.clear();
-    await _saveProfile();
+    await _repository.deleteAll();
     notifyListeners();
   }
   
@@ -143,32 +166,40 @@ class StudentProfileStore extends ChangeNotifier {
     return text[0].toUpperCase() + text.substring(1);
   }
   
-  /// Load profile from persistent storage
-  Future<void> _loadProfile() async {
+  /// Migrate from SharedPreferences to Isar
+  Future<void> _migrateFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final profileJson = prefs.getString(_storageKey);
+      final profileJson = prefs.getString(_legacyStorageKey);
       
       if (profileJson != null) {
+        debugPrint('Found legacy profile in SharedPreferences, migrating to Isar...');
         final decoded = jsonDecode(profileJson) as Map<String, dynamic>;
-        _profile.addAll(decoded);
-        debugPrint('Loaded student profile with ${_profile.length} entries');
-        notifyListeners();
+        
+        for (final entry in decoded.entries) {
+          await _repository.saveFact(entry.key, entry.value.toString());
+        }
+        
+        debugPrint('Migrated ${decoded.length} facts to Isar');
+        
+        // Remove from SharedPreferences after successful migration
+        await prefs.remove(_legacyStorageKey);
       }
     } catch (e) {
-      debugPrint('Error loading student profile: $e');
+      debugPrint('Error migrating profile from SharedPreferences: $e');
     }
   }
   
-  /// Save profile to persistent storage
-  Future<void> _saveProfile() async {
+  /// Load profile from Isar database
+  Future<void> _loadProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final profileJson = jsonEncode(_profile);
-      await prefs.setString(_storageKey, profileJson);
-      debugPrint('Saved student profile with ${_profile.length} entries');
+      final factsMap = await _repository.getAsMap();
+      _profile.clear();
+      _profile.addAll(factsMap);
+      debugPrint('Loaded student profile from Isar with ${_profile.length} entries');
+      notifyListeners();
     } catch (e) {
-      debugPrint('Error saving student profile: $e');
+      debugPrint('Error loading student profile: $e');
     }
   }
 }

@@ -12,27 +12,30 @@ import 'models/settings_model.dart';
 import 'models/student_profile_store.dart';
 import 'models/language_level_tracker.dart';
 import 'models/conversation_archive.dart';
+import 'database/database_service.dart';
 
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Set up error handling
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('Flutter error: ${details.exception}');
   };
   
-  // Initialize platform channels early
-  try {
-    const platform = MethodChannel('com.language_learning_chat/audio_player');
-    await platform.invokeMethod('initialize');
-  } catch (e) {
-    // Ignore errors, this is just to ensure the channel is registered
-    debugPrint('Audio player initialization: $e');
-  }
-
-  // Initialize context manager first
+  // Set preferred orientations
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
+  // Initialize Isar database FIRST
+  debugPrint('Initializing Isar database...');
+  await DatabaseService.initialize();
+  final stats = await DatabaseService.getStats();
+  debugPrint('Database initialized with: $stats');
+  
+  // Initialize context manager
   final contextManager = ContextManager();
   await contextManager.initialize();
   
@@ -41,7 +44,9 @@ void main() async {
   
   // Initialize student profile store and level tracker
   final profileStore = StudentProfileStore();
+  await profileStore.initialize();
   final levelTracker = LanguageLevelTracker();
+  await levelTracker.initialize();
   
   // Create conversation archive store
   final archiveStore = ConversationArchiveStore();

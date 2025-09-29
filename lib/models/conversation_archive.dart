@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../database/repositories/conversation_repository.dart';
+import '../database/models/conversation_db.dart';
 
 /// Represents an archived conversation
 class ArchivedConversation {
@@ -66,31 +68,26 @@ class ArchivedMessage {
   }
 }
 
-/// Manages conversation archives
+/// Manages conversation archives using Isar database
 class ConversationArchiveStore extends ChangeNotifier {
-  static const String _storageKey = 'conversation_archives';
+  static const String _legacyStorageKey = 'conversation_archives';
+  final ConversationRepository _repository = ConversationRepository();
   final List<ArchivedConversation> _archives = [];
   bool _isInitialized = false;
 
   List<ArchivedConversation> get archives => List.unmodifiable(_archives);
   bool get isInitialized => _isInitialized;
 
-  /// Initialize and load archives from storage
+  /// Initialize and load archives from Isar database
   Future<void> initialize() async {
     if (_isInitialized) return;
     
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? archivesJson = prefs.getString(_storageKey);
+      // Migrate from SharedPreferences if needed
+      await _migrateFromSharedPreferences();
       
-      if (archivesJson != null) {
-        final List<dynamic> decoded = jsonDecode(archivesJson);
-        _archives.clear();
-        _archives.addAll(
-          decoded.map((item) => ArchivedConversation.fromJson(item as Map<String, dynamic>)),
-        );
-        debugPrint('Loaded ${_archives.length} archived conversations');
-      }
+      // Load from Isar
+      await _loadFromDatabase();
       
       _isInitialized = true;
       notifyListeners();
@@ -100,30 +97,106 @@ class ConversationArchiveStore extends ChangeNotifier {
     }
   }
 
-  /// Save archives to storage
-  Future<void> _saveToStorage() async {
+  /// Migrate old SharedPreferences data to Isar
+  Future<void> _migrateFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final List<Map<String, dynamic>> archivesJson = _archives.map((a) => a.toJson()).toList();
-      await prefs.setString(_storageKey, jsonEncode(archivesJson));
-      debugPrint('Saved ${_archives.length} archived conversations');
+      final String? archivesJson = prefs.getString(_legacyStorageKey);
+      
+      if (archivesJson != null) {
+        debugPrint('Found legacy archives in SharedPreferences, migrating to Isar...');
+        final List<dynamic> decoded = jsonDecode(archivesJson);
+        
+        for (final item in decoded) {
+          final archived = ArchivedConversation.fromJson(item as Map<String, dynamic>);
+          
+          // Convert to Isar model
+          final conversationDB = ConversationDB()
+            ..timestamp = archived.timestamp
+            ..title = archived.title
+            ..isArchived = true
+            ..messages = archived.messages.map((m) => MessageDB()
+              ..content = m.content
+              ..isUser = m.isUser
+              ..timestamp = m.timestamp
+            ).toList();
+          
+          await _repository.save(conversationDB);
+        }
+        
+        debugPrint('Migrated ${decoded.length} conversations to Isar');
+        
+        // Remove from SharedPreferences after successful migration
+        await prefs.remove(_legacyStorageKey);
+      }
     } catch (e) {
-      debugPrint('Error saving archives: $e');
+      debugPrint('Error migrating from SharedPreferences: $e');
+    }
+  }
+
+  /// Load archives from Isar database
+  Future<void> _loadFromDatabase() async {
+    try {
+      final conversationsDB = await _repository.getAllArchived();
+      
+      _archives.clear();
+      _archives.addAll(conversationsDB.map((db) => ArchivedConversation(
+        id: db.id.toString(),
+        timestamp: db.timestamp,
+        title: db.title,
+        messages: db.messages.map((m) => ArchivedMessage(
+          content: m.content,
+          isUser: m.isUser,
+          timestamp: m.timestamp,
+        )).toList(),
+      )));
+      
+      debugPrint('Loaded ${_archives.length} archived conversations from Isar');
+    } catch (e) {
+      debugPrint('Error loading from database: $e');
     }
   }
 
   /// Add a conversation to the archive
   Future<void> archiveConversation(ArchivedConversation conversation) async {
-    _archives.insert(0, conversation); // Add to beginning (most recent first)
-    await _saveToStorage();
+    // Save to Isar
+    final conversationDB = ConversationDB()
+      ..timestamp = conversation.timestamp
+      ..title = conversation.title
+      ..isArchived = true
+      ..messages = conversation.messages.map((m) => MessageDB()
+        ..content = m.content
+        ..isUser = m.isUser
+        ..timestamp = m.timestamp
+      ).toList();
+    
+    final id = await _repository.save(conversationDB);
+    
+    // Update in-memory list
+    final archived = ArchivedConversation(
+      id: id.toString(),
+      timestamp: conversation.timestamp,
+      title: conversation.title,
+      messages: conversation.messages,
+    );
+    
+    _archives.insert(0, archived);
     notifyListeners();
+    
+    debugPrint('Conversation archived to Isar: ${conversation.title}');
   }
 
   /// Remove a conversation from the archive
   Future<void> deleteConversation(String id) async {
+    final numId = int.tryParse(id);
+    if (numId != null) {
+      await _repository.delete(numId);
+    }
+    
     _archives.removeWhere((conv) => conv.id == id);
-    await _saveToStorage();
     notifyListeners();
+    
+    debugPrint('Conversation deleted from Isar: $id');
   }
 
   /// Get a specific conversation by ID
@@ -137,9 +210,11 @@ class ConversationArchiveStore extends ChangeNotifier {
 
   /// Clear all archives
   Future<void> clearAll() async {
+    await _repository.deleteAllArchived();
     _archives.clear();
-    await _saveToStorage();
     notifyListeners();
+    
+    debugPrint('All archives cleared from Isar');
   }
 
   /// Generate a title from the first few messages
