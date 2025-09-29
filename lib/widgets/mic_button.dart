@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
@@ -17,6 +18,44 @@ class MicButton extends StatefulWidget {
 
 class _MicButtonState extends State<MicButton> {
   bool _cancelRecording = false;
+  bool _isSpeaking = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Schedule a post-frame callback to add the TTS listener
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addTtsListener();
+    });
+  }
+  
+  @override
+  void dispose() {
+    // Remove the TTS listener when disposing
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    ttsService.removeListener(_onTtsStateChanged);
+    super.dispose();
+  }
+  
+  void _addTtsListener() {
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    ttsService.addListener(_onTtsStateChanged);
+    // Initialize state
+    _isSpeaking = ttsService.isSpeaking;
+  }
+  
+  void _onTtsStateChanged() {
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    final newIsSpeaking = ttsService.isSpeaking;
+    
+    debugPrint('MicButton: TTS state changed, isSpeaking=$newIsSpeaking');
+    
+    if (_isSpeaking != newIsSpeaking) {
+      setState(() {
+        _isSpeaking = newIsSpeaking;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,17 +66,22 @@ class _MicButtonState extends State<MicButton> {
           builder: (context, speechService, chatService, ttsService, _) {
             final isListening = speechService.isListening;
             final isSpeaking = ttsService.isSpeaking;
+            
+            // Debug logs to track TTS state
+            debugPrint('MicButton: TTS service.isSpeaking=$isSpeaking, local._isSpeaking=$_isSpeaking');
+            
+            // Use our local state for more reliable UI updates
             final bgColor = isListening
                 ? (_cancelRecording
                       ? Colors.grey.shade400.withOpacity(0.8)
                       : Theme.of(context).colorScheme.primary.withOpacity(0.8))
-                : (isSpeaking ? Theme.of(context).colorScheme.primary.withOpacity(0.8) : Colors.transparent);
+                : (_isSpeaking ? Theme.of(context).colorScheme.primary.withOpacity(0.8) : Colors.transparent);
             final borderColor = isListening
                 ? (_cancelRecording ? Colors.grey.withOpacity(0.9) : Theme.of(context).colorScheme.primary.withOpacity(0.9))
-                : (isSpeaking
+                : (_isSpeaking
                       ? Theme.of(context).colorScheme.primary.withOpacity(0.9)
                       : Theme.of(context).colorScheme.primary.withOpacity(0.8));
-            final iconColor = (isListening || isSpeaking)
+            final iconColor = (isListening || _isSpeaking)
                 ? Colors.white
                 : Theme.of(context).colorScheme.primary;
 
@@ -162,7 +206,7 @@ class _MicButtonState extends State<MicButton> {
                   alignment: Alignment.center,
                   children: [
                     // Show sound wave animation when bot is talking, otherwise show mic icon
-                    isSpeaking 
+                    _isSpeaking 
                       ? SoundWaveAnimation(
                           color: Colors.white,
                           size: 48,

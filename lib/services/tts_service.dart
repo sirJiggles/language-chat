@@ -1,9 +1,27 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:collection/collection.dart';
 import '../models/settings_model.dart';
 import 'openai_tts_service.dart';
+
+/// A class to store audio data with its associated text and metadata
+class AudioCacheEntry {
+  final String text;
+  final Uint8List audioData;
+  final DateTime timestamp;
+  final String voice;
+  
+  AudioCacheEntry({
+    required this.text,
+    required this.audioData,
+    required this.timestamp,
+    required this.voice,
+  });
+}
 
 class TtsService extends ChangeNotifier {
   final FlutterTts _flutterTts = FlutterTts();
@@ -11,6 +29,81 @@ class TtsService extends ChangeNotifier {
   final SettingsModel _settingsModel;
   bool _isSpeaking = false;
   String? _lastSpokenText;
+  
+  // Audio cache - stores the last 5 messages
+  final int _maxCacheSize = 5;
+  final Map<String, AudioCacheEntry> _audioCache = {};
+  
+  // Get a sorted list of cache entries (most recent first)
+  List<AudioCacheEntry> get cachedEntries => 
+      _audioCache.values.sorted((a, b) => b.timestamp.compareTo(a.timestamp)).toList();
+  
+  /// Add an entry to the audio cache
+  void _addToCache(String text, Uint8List audioData, String voice) {
+    // Create a normalized key for the cache (lowercase, trimmed)
+    final key = text.trim().toLowerCase();
+    
+    // Add or update the cache entry
+    _audioCache[key] = AudioCacheEntry(
+      text: text,
+      audioData: audioData,
+      timestamp: DateTime.now(),
+      voice: voice,
+    );
+    
+    // Enforce the cache size limit (LRU policy)
+    _enforceCacheLimit();
+    
+    debugPrint('TTS Service: Added "${text.substring(0, text.length > 20 ? 20 : text.length)}..." to audio cache');
+    debugPrint('TTS Service: Cache now contains ${_audioCache.length} entries');
+  }
+  
+  /// Get an entry from the audio cache if available
+  AudioCacheEntry? _getFromCache(String text) {
+    // Create a normalized key for the cache (lowercase, trimmed)
+    final key = text.trim().toLowerCase();
+    
+    // Check if the entry exists in the cache
+    final entry = _audioCache[key];
+    
+    if (entry != null) {
+      // Update the timestamp to mark it as recently used
+      _audioCache[key] = AudioCacheEntry(
+        text: entry.text,
+        audioData: entry.audioData,
+        timestamp: DateTime.now(),
+        voice: entry.voice,
+      );
+      
+      debugPrint('TTS Service: Cache hit for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
+      return entry;
+    }
+    
+    debugPrint('TTS Service: Cache miss for "${text.substring(0, text.length > 20 ? 20 : text.length)}..."');
+    return null;
+  }
+  
+  /// Enforce the cache size limit using LRU policy
+  void _enforceCacheLimit() {
+    if (_audioCache.length <= _maxCacheSize) return;
+    
+    // Sort entries by timestamp (oldest first)
+    final sortedEntries = cachedEntries.reversed.toList();
+    
+    // Remove oldest entries until we're back at the limit
+    while (_audioCache.length > _maxCacheSize) {
+      final oldestEntry = sortedEntries.removeAt(0);
+      final keyToRemove = oldestEntry.text.trim().toLowerCase();
+      _audioCache.remove(keyToRemove);
+      debugPrint('TTS Service: Removed oldest cache entry: "${oldestEntry.text.substring(0, oldestEntry.text.length > 20 ? 20 : oldestEntry.text.length)}..."');
+    }
+  }
+  
+  /// Clear the audio cache
+  void clearCache() {
+    _audioCache.clear();
+    debugPrint('TTS Service: Audio cache cleared');
+  }
   
   TtsService({required SettingsModel settingsModel, String? openaiApiKey}) : _settingsModel = settingsModel {
     // Initialize OpenAI TTS if API key is provided
@@ -24,8 +117,11 @@ class TtsService extends ChangeNotifier {
       // Set up completion callback
       _openAITts!.onPlaybackComplete = () {
         _isSpeaking = false;
-        notifyListeners();
         debugPrint('TTS Service: OpenAI playback completed, notifying listeners');
+        // Make sure to notify on the main thread
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
       };
     }
   }
@@ -143,8 +239,11 @@ class TtsService extends ChangeNotifier {
     // Set up completion listener for system TTS
     _flutterTts.setCompletionHandler(() {
       _isSpeaking = false;
-      notifyListeners();
       debugPrint('TTS Service: System TTS playback completed, notifying listeners');
+      // Make sure to notify on the main thread
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     });
   }
 
@@ -206,29 +305,52 @@ class TtsService extends ChangeNotifier {
     
     _lastSpokenText = cleanText;
     _isSpeaking = true;
-    notifyListeners();
-    debugPrint('TTS Service: Set isSpeaking=true and notified listeners');
+    debugPrint('TTS Service: Set isSpeaking=true and notifying listeners');
+    // Make sure to notify on the main thread
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
     
     try {
       // Use OpenAI TTS if selected and available
       if (_settingsModel.ttsProvider == TtsProvider.openai && _openAITts != null) {
         debugPrint('TTS Service: Using OpenAI TTS provider');
-        await _openAITts!.speak(cleanText);
-        debugPrint('TTS Service: OpenAI TTS speak method returned');
-        // Completion will be handled by the callback we set up in the constructor
+        
+        // Check if we have this text in the cache
+        final cachedEntry = _getFromCache(cleanText);
+        final currentVoice = _settingsModel.openaiTtsVoice;
+        
+        if (cachedEntry != null && cachedEntry.voice == currentVoice) {
+          // Use cached audio data
+          debugPrint('TTS Service: Using cached audio data');
+          await _openAITts!.playAudio(cachedEntry.audioData);
+        } else {
+          // Generate new audio
+          debugPrint('TTS Service: Generating new audio');
+          final audioData = await _openAITts!.speak(cleanText);
+          
+          // Cache the audio data if available
+          if (audioData != null) {
+            _addToCache(cleanText, audioData, currentVoice);
+          }
+        }
       } else {
         // Use system TTS
         debugPrint('TTS Service: Using system TTS provider');
         await _flutterTts.speak(cleanText);
-        debugPrint('TTS Service: System TTS speak method returned');
-        // Completion will be handled by the completion handler we set up in initialize()
+        // Note: We can't cache system TTS audio as we don't have access to the raw audio data
       }
     } catch (e) {
       debugPrint('TTS Service: Error speaking text: $e');
       _isSpeaking = false;
-      notifyListeners();
+      // Make sure to notify on the main thread
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     }
   }
+  
+  // Helper methods are defined at the bottom of the class
 
   Future<void> stop() async {
     debugPrint('TTS Service: stop method called, isSpeaking=$_isSpeaking');
@@ -242,7 +364,10 @@ class TtsService extends ChangeNotifier {
       }
       _isSpeaking = false;
       debugPrint('TTS Service: Set isSpeaking=false and notifying listeners');
-      notifyListeners();
+      // Make sure to notify on the main thread
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } else {
       debugPrint('TTS Service: Not speaking, no need to stop');
     }

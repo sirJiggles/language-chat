@@ -59,11 +59,13 @@ class OpenAITtsService {
     }
   }
 
-  Future<void> speak(String text) async {
+  /// Generate and play speech from text
+  /// Returns the audio data if successful, null otherwise
+  Future<Uint8List?> speak(String text) async {
     debugPrint('OpenAI TTS: speak method called with text length ${text.length}');
     if (text.isEmpty) {
       debugPrint('OpenAI TTS: Empty text, nothing to speak');
-      return;
+      return null;
     }
     
     if (_apiKey.isEmpty) {
@@ -89,8 +91,9 @@ class OpenAITtsService {
       final audioData = await _generateSpeech(text);
       if (audioData != null) {
         debugPrint('OpenAI TTS: Audio data generated successfully, playing audio');
-        await _playAudio(audioData);
-        debugPrint('OpenAI TTS: _playAudio method returned');
+        await playAudio(audioData);
+        debugPrint('OpenAI TTS: playAudio method returned');
+        return audioData; // Return the audio data for caching
       } else {
         debugPrint('OpenAI TTS: No audio data generated');
         _isSpeaking = false;
@@ -99,6 +102,7 @@ class OpenAITtsService {
       debugPrint('Error in OpenAI TTS: $e');
       _isSpeaking = false;
     }
+    return null; // Return null if there was an error
   }
 
   Future<Uint8List?> _generateSpeech(String text) async {
@@ -131,7 +135,8 @@ class OpenAITtsService {
     }
   }
 
-  Future<void> _playAudio(Uint8List audioData) async {
+  /// Play audio from bytes
+  Future<void> playAudio(Uint8List audioData) async {
     try {
       debugPrint('OpenAI TTS: Playing audio bytes of size ${audioData.length}');
       // Play the audio directly from bytes

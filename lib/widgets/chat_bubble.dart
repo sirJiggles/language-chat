@@ -50,10 +50,12 @@ class ChatBubble extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: IconButton(
                       icon: Icon(
-                        Icons.volume_up,
+                        ttsService.isSpeaking 
+                            ? Icons.stop // Show stop icon when speaking
+                            : Icons.volume_up, // Show play icon when not speaking
                         size: 16,
                         color: ttsService.isSpeaking 
-                            ? Theme.of(context).colorScheme.tertiary.withOpacity(0.4) // Dimmed when disabled
+                            ? Theme.of(context).colorScheme.tertiary // Brighter when speaking
                             : Theme.of(context).colorScheme.tertiary.withOpacity(0.8), // Normal color
                       ),
                       constraints: const BoxConstraints(
@@ -64,12 +66,26 @@ class ChatBubble extends StatelessWidget {
                       iconSize: 16,
                       visualDensity: VisualDensity.compact,
                       onPressed: ttsService.isSpeaking 
-                          ? null // Disable button while speaking
-                          : () {
+                          ? () {
+                              // Stop speaking if already speaking
+                              debugPrint('ChatBubble: Stopping TTS');
+                              ttsService.stop();
+                            }
+                          : () async {
                               // Get the message text
                               final messageText = message;
+                              debugPrint('ChatBubble: Playing audio for message');
+                              
+                              // Make sure any ongoing TTS is stopped
+                              if (ttsService.isSpeaking) {
+                                await ttsService.stop();
+                                // Small delay to ensure stop completes
+                                await Future.delayed(const Duration(milliseconds: 100));
+                              }
+                              
                               // Play the audio
-                              ttsService.speak(messageText);
+                              await ttsService.speak(messageText);
+                              debugPrint('ChatBubble: TTS speak method returned');
                             },
                     ),
                   );
