@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/tts_service.dart';
 import '../models/settings_model.dart';
+import '../models/student_profile_store.dart';
+import '../models/language_level_tracker.dart';
+import '../models/conversation_archive.dart';
 import '../services/openai_tts_service.dart';
+import '../database/database_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -140,9 +144,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: const Icon(Icons.save),
             label: const Text('Apply'),
           ),
+          
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // Danger Zone
+          Text(
+            'Danger Zone',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.red,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Warning: This will permanently delete all your data',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Reset All Data Button
+          OutlinedButton.icon(
+            onPressed: _confirmResetAllData,
+            icon: const Icon(Icons.delete_forever, color: Colors.red),
+            label: const Text('Reset All Data', style: TextStyle(color: Colors.red)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.red),
+            ),
+          ),
         ],
       ),
     );
+  }
+  
+  void _confirmResetAllData() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset All Data?'),
+        content: const Text(
+          'This will permanently delete:\n\n'
+          '• All archived conversations\n'
+          '• All student profile facts\n'
+          '• All language level assessments\n'
+          '• Current conversation\n\n'
+          'This action cannot be undone!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _resetAllData();
+            },
+            child: const Text('Delete Everything', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _resetAllData() async {
+    try {
+      // Show loading
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Deleting all data...')),
+      );
+      
+      // Clear all database data
+      await DatabaseService.clearAllData();
+      
+      // Clear current conversation
+      final chatService = context.read<ChatService>();
+      chatService.clearConversation();
+      chatService.clearAssessment();
+      
+      // Reload stores to reflect empty state
+      final profileStore = context.read<StudentProfileStore>();
+      final levelTracker = context.read<LanguageLevelTracker>();
+      final archiveStore = context.read<ConversationArchiveStore>();
+      
+      await profileStore.initialize();
+      await levelTracker.initialize();
+      await archiveStore.initialize();
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All data deleted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Go back to chat screen
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error resetting data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _apply() {

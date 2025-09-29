@@ -1,8 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import '../services/context_manager.dart';
 import '../services/chat_service.dart';
 import '../models/language_level_tracker.dart';
 import 'student_profile_view.dart';
@@ -14,7 +11,6 @@ class DebugMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final contextManager = Provider.of<ContextManager>(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Debug Menu')),
@@ -102,83 +98,11 @@ class DebugMenu extends StatelessWidget {
                     );
                   },
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Reset Student Profile', style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Delete current profile and start fresh'),
-                  onTap: () {
-                    _confirmResetProfile(context, contextManager);
-                  },
-                ),
               ],
             ),
           ),
         ],
       ),
     );
-  }
-
-  void _confirmResetProfile(BuildContext context, ContextManager contextManager) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Student Profile'),
-        content: const Text(
-          'This will delete the current student profile and all conversation history. Are you sure?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _resetProfile(context);
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Profile reset successfully')));
-              }
-            },
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _resetProfile(BuildContext context) async {
-    try {
-      // Try application support directory first
-      Directory baseDir;
-      try {
-        baseDir = await getApplicationSupportDirectory();
-        debugPrint('Using application support directory: ${baseDir.path}');
-      } catch (e) {
-        // Fall back to documents directory
-        baseDir = await getApplicationDocumentsDirectory();
-        debugPrint('Using documents directory: ${baseDir.path}');
-      }
-
-      final profileFile = File('${baseDir.path}/context/student_profile.json');
-      debugPrint('Checking for profile at: ${profileFile.path}');
-
-      if (await profileFile.exists()) {
-        await profileFile.delete();
-        debugPrint('Deleted student profile');
-      }
-
-      final conversationsDir = Directory('${baseDir.path}/context/conversations');
-      debugPrint('Checking for conversations at: ${conversationsDir.path}');
-      if (await conversationsDir.exists()) {
-        await conversationsDir.delete(recursive: true);
-        debugPrint('Deleted conversations directory');
-      }
-
-      // Reinitialize context manager
-      final contextManager = Provider.of<ContextManager>(context, listen: false);
-      await contextManager.initialize();
-    } catch (e) {
-      debugPrint('Error resetting profile: $e');
-    }
   }
 }

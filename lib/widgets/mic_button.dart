@@ -21,6 +21,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
   bool _isSpeaking = false;
   late AnimationController _scaleController;
   late Animation<double> _scaleAnimation;
+  TtsService? _ttsService;
   
   @override
   void initState() {
@@ -34,27 +35,26 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
     );
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     
-    // Schedule a post-frame callback to add the TTS listener
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _addTtsListener();
-    });
+    // Store TTS service reference safely
+    if (_ttsService == null) {
+      _ttsService = Provider.of<TtsService>(context, listen: false);
+      _ttsService!.addListener(_onTtsStateChanged);
+      _isSpeaking = _ttsService!.isSpeaking;
+    }
   }
   
   @override
   void dispose() {
-    // Remove the TTS listener when disposing
-    final ttsService = Provider.of<TtsService>(context, listen: false);
-    ttsService.removeListener(_onTtsStateChanged);
+    // Remove the TTS listener using stored reference
+    _ttsService?.removeListener(_onTtsStateChanged);
     _scaleController.dispose();
     super.dispose();
-  }
-  
-  void _addTtsListener() {
-    final ttsService = Provider.of<TtsService>(context, listen: false);
-    ttsService.addListener(_onTtsStateChanged);
-    // Initialize state
-    _isSpeaking = ttsService.isSpeaking;
   }
   
   void _onTtsStateChanged() {
@@ -114,52 +114,13 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                 }
                 if (speechService.isListening) {
                   await speechService.stopListening();
-                  if (!_cancelRecording && speechService.lastWords.isNotEmpty) {
-                    final response = await chatService.sendMessage(speechService.lastWords);
-
-                    // Always speak the response
-                    final bool shouldSpeak = true;
-
-                    debugPrint('Speaking response: $shouldSpeak');
-
-                    if (shouldSpeak) {
-                      try {
-                        // Make sure the response is a valid string that can be spoken
-                        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
-                        debugPrint('MicButton: Speaking response: "${cleanResponse.substring(0, cleanResponse.length > 30 ? 30 : cleanResponse.length)}..."');
-                        
-                        // Get TTS service and ensure it's ready
-                        final ttsService = context.read<TtsService>();
-                        
-                        // Stop any ongoing speech first
-                        if (ttsService.isSpeaking) {
-                          debugPrint('MicButton: Stopping ongoing speech before starting new one');
-                          await ttsService.stop();
-                          // Small delay to ensure stop completes
-                          await Future.delayed(const Duration(milliseconds: 100));
-                        }
-                        
-                        // Speak the response
-                        debugPrint('MicButton: Calling TTS service speak method');
-                        await ttsService.speak(cleanResponse);
-                        debugPrint('MicButton: TTS speak method returned');
-                      } catch (e) {
-                        debugPrint('Error speaking response: $e');
-                        // Try to stop any ongoing TTS that might be causing issues
-                        try {
-                          await context.read<TtsService>().stop();
-                        } catch (stopError) {
-                          debugPrint('Error stopping TTS: $stopError');
-                        }
-                      }
-                    }
-
-                    // Auto-scroll to bottom after message and response
-                    widget.onScrollToBottom();
-                  } else {
-                    // canceled
+                  
+                  // If canceled (swiped up), clear the text
+                  if (_cancelRecording) {
                     speechService.clearLastWords();
                   }
+                  // Otherwise, text stays in field - user can edit and send manually
+                  
                   setState(() => _cancelRecording = false);
                 }
               },
