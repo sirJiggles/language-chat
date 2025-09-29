@@ -9,6 +9,8 @@ import 'services/tts_service.dart';
 import 'services/context_manager.dart';
 import 'services/assessment_service.dart';
 import 'models/settings_model.dart';
+import 'models/student_profile_store.dart';
+import 'models/language_level_tracker.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -35,46 +37,46 @@ void main() async {
   
   // Initialize settings model
   final settingsModel = SettingsModel();
+  
+  // Initialize student profile store and level tracker
+  final profileStore = StudentProfileStore();
+  final levelTracker = LanguageLevelTracker();
+  
+  // Connect the new stores to the context manager
+  contextManager.setStores(
+    profileStore: profileStore,
+    levelTracker: levelTracker,
+  );
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: contextManager),
         ChangeNotifierProvider.value(value: settingsModel),
+        ChangeNotifierProvider.value(value: profileStore),
+        ChangeNotifierProvider.value(value: levelTracker),
 
-        // Create assessment service
+        // Create assessment service with new architecture
         ChangeNotifierProvider(
           create: (_) => AssessmentService(
-            ollamaBaseUrl: const String.fromEnvironment(
-              'OLLAMA_BASE_URL',
-              defaultValue: 'http://localhost:11434',
+            apiKey: const String.fromEnvironment(
+              'OPENAI_API_KEY',
+              defaultValue: '',
             ),
-            ollamaModel: const String.fromEnvironment(
-              'OLLAMA_MODEL',
-              defaultValue: 'deepseek-r1:8b',
-            ),
-            contextManager: contextManager,
+            profileStore: profileStore,
+            levelTracker: levelTracker,
           ),
         ),
 
         // Other services
         ChangeNotifierProvider(
           create: (context) => ChatService(
-            ollamaBaseUrl: const String.fromEnvironment(
-              'OLLAMA_BASE_URL',
-              defaultValue: 'http://localhost:11434',
-            ),
-            ollamaModel: const String.fromEnvironment(
-              'OLLAMA_MODEL',
-              defaultValue: 'deepseek-r1:8b',
-            ),
             targetLanguage: const String.fromEnvironment(
               'TARGET_LANGUAGE',
               defaultValue: 'Spanish',
             ),
             contextManager: contextManager,
             assessmentService: Provider.of<AssessmentService>(context, listen: false),
-            settingsModel: settingsModel,
             openaiApiKey: const String.fromEnvironment(
               'OPENAI_API_KEY',
               defaultValue: '',

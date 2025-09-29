@@ -3,16 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 import '../models/message_store.dart';
-import '../models/settings_model.dart';
 import 'context_manager.dart';
 import 'assessment_service.dart';
 
 class ChatService extends ChangeNotifier {
-  final String _ollamaBaseUrl;
-  final String _ollamaModel;
   final ContextManager _contextManager;
   final AssessmentService _assessmentService;
-  final SettingsModel _settingsModel;
   final String? _openaiApiKey;
 
   // Separate message stores for conversation and assessment
@@ -20,18 +16,12 @@ class ChatService extends ChangeNotifier {
   late final MessageStore _assessmentStore;
 
   ChatService({
-    required String ollamaBaseUrl,
-    required String ollamaModel,
     required ContextManager contextManager,
     required AssessmentService assessmentService,
-    required SettingsModel settingsModel,
     String? openaiApiKey,
     String targetLanguage = 'German',
-  }) : _ollamaBaseUrl = ollamaBaseUrl,
-       _ollamaModel = ollamaModel,
-       _contextManager = contextManager,
+  }) : _contextManager = contextManager,
        _assessmentService = assessmentService,
-       _settingsModel = settingsModel,
        _openaiApiKey = openaiApiKey {
     _targetLanguage = targetLanguage;
     _conversationStore = MessageStore(name: 'conversation');
@@ -53,8 +43,6 @@ class ChatService extends ChangeNotifier {
   String get lastResponse => _lastResponse;
   String get targetLanguage => _targetLanguage;
   bool get isThinking => _isThinking;
-  List<Map<String, dynamic>> get assessmentResults => _assessmentService.assessmentResults;
-  String get assessmentLog => _assessmentService.assessmentLog;
 
   Future<String> sendMessage(String message, {bool hideUserMessage = false}) async {
     // Create a user message
@@ -96,51 +84,27 @@ class ChatService extends ChangeNotifier {
       final systemPrompt = 'You are a friendly language learning assistant for $_targetLanguage. '
           'Respond in $_targetLanguage at a level appropriate for the student. '
           'Keep responses concise and helpful for language learning. '
-          'If the user speaks in another language, gently encourage them to try in $_targetLanguage.\n\n'
-          'If you need to include your thinking process or reasoning that should not be shown to the student, '
-          'wrap it in <think></think> tags. This content will be hidden from the student but will be used for assessment.';
+          'If the user speaks in another language, gently encourage them to try in $_targetLanguage.';
 
-      String assistantMessage;
-      
-      // Choose API based on settings
-      if (_settingsModel.chatProvider == ChatProvider.ollama) {
-        assistantMessage = await _sendMessageToOllama(systemPrompt, prompt);
-      } else {
-        assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);
-      }
+      // Call OpenAI API
+      final assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);
 
-      // Filter out any content wrapped in <think></think> tags
-      final filteredMessage = _filterThinkingContent(assistantMessage);
-      
-      // Debug the filtering
-      debugPrint('Original message: $assistantMessage');
-      debugPrint('Filtered message: $filteredMessage');
-
-      // Debug thinking state before removal
-      debugPrint('Before removing thinking message: isThinking=$_isThinking, thinkingMessageId=$_thinkingMessageId');
-      debugPrint('Thinking messages in store: ${_conversationStore.messages.where((m) => m.isThinking).length}');
-      
       // Remove the thinking message
       _conversationStore.removeThinking();
       _isThinking = false;
       _thinkingMessageId = '';
-      
-      // Debug thinking state after removal
-      debugPrint('After removing thinking message: isThinking=$_isThinking, thinkingMessageId=$_thinkingMessageId');
-      debugPrint('Thinking messages in store: ${_conversationStore.messages.where((m) => m.isThinking).length}');
 
-      // Only add the message to the conversation if it's not empty after filtering
-      if (filteredMessage.isNotEmpty) {
-        // Add the real response
+      // Add the response to conversation
+      if (assistantMessage.isNotEmpty) {
         _conversationStore.addMessage(
-          Message(content: filteredMessage, source: MessageSource.conversationBot),
+          Message(content: assistantMessage, source: MessageSource.conversationBot),
         );
       }
       
       // Ensure UI updates
       notifyListeners();
 
-      _lastResponse = filteredMessage;
+      _lastResponse = assistantMessage;
 
       // Perform background assessment - use the original message for assessment
       await _assessmentService.performBackgroundAssessment(
@@ -155,8 +119,8 @@ class ChatService extends ChangeNotifier {
         _assessmentStore.addMessage(_assessmentService.lastAssessmentMessage!);
       }
 
-      // Return the filtered message to the user
-      return filteredMessage;
+      // Return the message to the user
+      return assistantMessage;
     } catch (e) {
       debugPrint('Error sending message: $e');
 
@@ -178,34 +142,6 @@ class ChatService extends ChangeNotifier {
         _thinkingMessageId = '';
         notifyListeners();
       }
-    }
-  }
-  
-  Future<String> _sendMessageToOllama(String systemPrompt, String prompt) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_ollamaBaseUrl/api/chat'),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': _ollamaModel,
-          'messages': [
-            {'role': 'system', 'content': systemPrompt},
-            {'role': 'user', 'content': prompt},
-          ],
-          'stream': false,
-          'options': {'temperature': 0.7},
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['message']?['content'] ?? '';
-      } else {
-        throw Exception('Ollama API error: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      debugPrint('Error with Ollama API: $e');
-      throw Exception('Failed to communicate with Ollama: $e');
     }
   }
 
@@ -264,46 +200,5 @@ class ChatService extends ChangeNotifier {
     }
 
     notifyListeners();
-  }
-
-  // Filter out content wrapped in <think></think> tags
-  String _filterThinkingContent(String message) {
-    // Use regex to remove any content between <think> and </think> tags
-    final thinkingPattern = RegExp(r'<think>.*?</think>', dotAll: true);
-    final filteredMessage = message.replaceAll(thinkingPattern, '').trim();
-    
-    // Debug the filtering process
-    debugPrint('Filtering message:');
-    debugPrint('Original: $message');
-    debugPrint('Filtered: $filteredMessage');
-    
-    // If the message contains thinking content, add it to the assessment store
-    if (message.contains('<think>')) {
-      // Extract the thinking content
-      final thinkingContent = _extractThinkingContent(message);
-      if (thinkingContent.isNotEmpty) {
-        // Create an assessment message with the thinking content
-        _assessmentStore.addMessage(Message(
-          content: thinkingContent,
-          source: MessageSource.assessmentBot,
-        ));
-      }
-    }
-    
-    // Make sure we're not returning an empty message
-    if (filteredMessage.isEmpty && message.isNotEmpty) {
-      // If the entire message was wrapped in think tags, return a placeholder
-      debugPrint('Warning: Entire message was filtered out. Using original message.');
-      return message;
-    }
-    
-    return filteredMessage;
-  }
-  
-  // Extract content from <think></think> tags
-  String _extractThinkingContent(String message) {
-    final thinkingPattern = RegExp(r'<think>(.*?)</think>', dotAll: true);
-    final match = thinkingPattern.firstMatch(message);
-    return match?.group(1)?.trim() ?? '';
   }
 }

@@ -1,26 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum ChatProvider {
-  ollama,
-  chatgpt,
-}
-
 enum TtsProvider {
   system,  // Default Flutter TTS
   openai,  // OpenAI TTS API
 }
 
 class SettingsModel extends ChangeNotifier {
-  static const String _chatProviderKey = 'chat_provider';
   static const String _ttsProviderKey = 'tts_provider';
   static const String _openaiTtsVoiceKey = 'openai_tts_voice';
   
-  ChatProvider _chatProvider = ChatProvider.ollama;
-  TtsProvider _ttsProvider = TtsProvider.system;
-  String _openaiTtsVoice = 'alloy'; // Default OpenAI voice
+  TtsProvider _ttsProvider = TtsProvider.openai; // Default to OpenAI
+  String _openaiTtsVoice = 'nova'; // Default OpenAI voice
   
-  ChatProvider get chatProvider => _chatProvider;
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
   
@@ -30,19 +22,6 @@ class SettingsModel extends ChangeNotifier {
   
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Load chat provider
-    final chatProviderString = prefs.getString(_chatProviderKey);
-    if (chatProviderString != null) {
-      try {
-        _chatProvider = ChatProvider.values.firstWhere(
-          (e) => e.toString() == 'ChatProvider.$chatProviderString',
-          orElse: () => ChatProvider.ollama,
-        );
-      } catch (_) {
-        _chatProvider = ChatProvider.ollama;
-      }
-    }
     
     // Load TTS provider
     final ttsProviderString = prefs.getString(_ttsProviderKey);
@@ -64,17 +43,6 @@ class SettingsModel extends ChangeNotifier {
     }
     
     notifyListeners();
-  }
-  
-  Future<void> setChatProvider(ChatProvider provider) async {
-    if (_chatProvider != provider) {
-      _chatProvider = provider;
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_chatProviderKey, provider.toString().split('.').last);
-      
-      notifyListeners();
-    }
   }
   
   Future<void> setTtsProvider(TtsProvider provider) async {

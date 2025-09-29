@@ -4,10 +4,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../services/context_manager.dart';
 import '../services/chat_service.dart';
-import 'assessment_view.dart';
-import 'assessment_thinking_viewer.dart';
-import '../screens/assessment_screen.dart';
-import 'message_debug_view.dart';
+import '../models/language_level_tracker.dart';
+import 'student_profile_view.dart';
+import 'assessment_activity_view.dart';
 
 /// A debug menu to access debugging tools
 class DebugMenu extends StatelessWidget {
@@ -25,9 +24,9 @@ class DebugMenu extends StatelessWidget {
           // Current level display
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Consumer2<ContextManager, ChatService>(
-              builder: (context, contextManager, chatService, _) {
-                final currentLevel = contextManager.studentProfile?.proficiencyLevel ?? 'Unknown';
+            child: Consumer2<LanguageLevelTracker, ChatService>(
+              builder: (context, levelTracker, chatService, _) {
+                final currentLevel = levelTracker.currentLevel;
                 final targetLanguage = chatService.targetLanguage;
                 
                 return Card(
@@ -41,23 +40,33 @@ class DebugMenu extends StatelessWidget {
                           color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$targetLanguage Level',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              currentLevel,
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$targetLanguage Level',
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                currentLevel,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                levelTracker.getTrend(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -72,40 +81,31 @@ class DebugMenu extends StatelessWidget {
             child: ListView(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.assessment),
-                  title: const Text('View Language Assessment'),
-                  subtitle: const Text('See detailed assessment results'),
+                  leading: const Icon(Icons.person),
+                  title: const Text('Student Profile & Assessment'),
+                  subtitle: const Text('View personal facts, language level, and assessment history'),
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentView()));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.chat),
-                  title: const Text('View Assessment Bot Conversation'),
-                  subtitle: const Text('See the assessment reasoning process as a chat'),
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentThinkingViewer()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const StudentProfileView()),
+                    );
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.psychology),
-                  title: const Text('New Assessment View'),
-                  subtitle: const Text('View assessments with the new message model'),
+                  title: const Text('Assessment Bot Activity'),
+                  subtitle: const Text('See what the background bot is learning about you'),
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AssessmentActivityView()),
+                    );
                   },
                 ),
+                const Divider(),
                 ListTile(
-                  leading: const Icon(Icons.message),
-                  title: const Text('Message Debug View'),
-                  subtitle: const Text('Inspect all messages in the conversation store'),
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MessageDebugView()));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete),
-                  title: const Text('Reset Student Profile'),
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Reset Student Profile', style: TextStyle(color: Colors.red)),
                   subtitle: const Text('Delete current profile and start fresh'),
                   onTap: () {
                     _confirmResetProfile(context, contextManager);

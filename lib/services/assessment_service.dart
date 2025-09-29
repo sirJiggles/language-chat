@@ -1,280 +1,263 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import '../models/message.dart';
-import 'context_manager.dart';
+import '../models/student_profile_store.dart';
+import '../models/language_level_tracker.dart';
 
 /// Service for handling language assessment functionality
+/// New architecture: Extracts facts + Tracks level over time
 class AssessmentService extends ChangeNotifier {
-  final String _ollamaBaseUrl;
-  final String _ollamaModel;
-  final ContextManager _contextManager;
+  final String _apiKey;
+  final StudentProfileStore _profileStore;
+  final LanguageLevelTracker _levelTracker;
 
-  // Queue to store pending messages for assessment
+  // Queue to store pending assessments
   final List<Map<String, String>> _pendingAssessments = [];
-  bool _isAssessing = false;
+  bool _isProcessing = false;
 
-  // Store assessment results for debug viewing
-  final List<Map<String, dynamic>> _assessmentResults = [];
+  // Counter for level assessments (assess every N messages)
+  int _messageCount = 0;
+  static const int _levelAssessmentInterval = 5; // Assess level every 5 messages
 
-  // Simple log of assessment results for display
-  String _assessmentLog = '';
-
-  // Last assessment result for adding to message store
-  String _lastAssessmentResult = '';
-  
-  // Last assessment message
+  // Last assessment message for display
   Message? _lastAssessmentMessage;
 
   AssessmentService({
-    required String ollamaBaseUrl,
-    required String ollamaModel,
-    required ContextManager contextManager,
-  }) : _ollamaBaseUrl = ollamaBaseUrl,
-       _ollamaModel = ollamaModel,
-       _contextManager = contextManager {
-    // Load assessment results when service is created
-    _loadAssessmentResults();
-  }
+    required String apiKey,
+    required StudentProfileStore profileStore,
+    required LanguageLevelTracker levelTracker,
+  })  : _apiKey = apiKey,
+        _profileStore = profileStore,
+        _levelTracker = levelTracker;
 
   // Getters
-  List<Map<String, dynamic>> get assessmentResults => _assessmentResults;
-  String get assessmentLog => _assessmentLog;
-  String get lastAssessmentResult => _lastAssessmentResult;
   Message? get lastAssessmentMessage => _lastAssessmentMessage;
-  
-  // Create an assessment message from the assessment result
-  Message createAssessmentMessage(String assessmentResult) {
-    return Message(
-      content: assessmentResult,
-      source: MessageSource.assessmentBot,
-      timestamp: DateTime.now(),
-    );
-  }
-  
-  // Process assessment result and create a message
-  Message processAssessmentResult(String aiAssessment, String assessedLevel) {
-    // Format the assessment result with the level highlighted
-    final formattedAssessment = 'Language Assessment (Level: $assessedLevel):\n\n$aiAssessment';
-    
-    return Message(
-      content: formattedAssessment,
-      source: MessageSource.assessmentBot,
-      timestamp: DateTime.now(),
-    );
-  }
+  StudentProfileStore get profileStore => _profileStore;
+  LanguageLevelTracker get levelTracker => _levelTracker;
 
-  // Perform language assessment in the background
+  /// Perform background assessment on a conversation
   Future<void> performBackgroundAssessment(
     String userMessage,
     String assistantMessage,
     String targetLanguage, {
     bool hideUserMessage = false,
   }) async {
-    // Skip assessment for hidden system messages like the initial greeting trigger
+    // Skip assessment for hidden system messages
     if (hideUserMessage && userMessage == 'Hallo') {
       debugPrint('Skipping assessment for hidden system message');
       return;
     }
 
-    // Reset last assessment result
-    _lastAssessmentResult = '';
+    _messageCount++;
 
-    // Add this conversation to the pending queue
+    // Add to queue
     _pendingAssessments.add({
       'userMessage': userMessage,
       'assistantMessage': assistantMessage,
       'targetLanguage': targetLanguage,
     });
 
-    // Start processing if not already in progress
-    if (!_isAssessing) {
-      await _processAssessmentQueue();
+    // Start processing if not already running
+    if (!_isProcessing) {
+      await _processQueue();
     }
   }
 
-  // Process the assessment queue in the background
-  Future<void> _processAssessmentQueue() async {
-    if (_pendingAssessments.isEmpty || _isAssessing) return;
+  /// Process the assessment queue
+  Future<void> _processQueue() async {
+    if (_pendingAssessments.isEmpty || _isProcessing) return;
 
-    _isAssessing = true;
+    _isProcessing = true;
 
     try {
-      // Process one assessment at a time to avoid overloading
-      if (_pendingAssessments.isNotEmpty) {
+      while (_pendingAssessments.isNotEmpty) {
         final conversation = _pendingAssessments.removeAt(0);
         final userMessage = conversation['userMessage']!;
         final assistantMessage = conversation['assistantMessage']!;
         final targetLanguage = conversation['targetLanguage']!;
 
         try {
-          // Assess language level
-          final assessmentPrompt =
-              'Based on the conversation:\\n\\nUser: "$userMessage"\\nAssistant: "$assistantMessage"\\n\\nAssess the user\'s proficiency level in $targetLanguage according to CEFR standards (A1-C2). Consider vocabulary range, grammatical accuracy, fluency, and complexity. First, provide your detailed reasoning about why you are choosing a particular level, analyzing the user\'s language use. Then, on a new line, write "LEVEL:" followed by the CEFR level (A1, A2, B1, B2, C1, or C2).';
+          // Always extract facts
+          await _extractFacts(userMessage, assistantMessage, targetLanguage);
 
-          // Make API call for assessment
-          final assessmentResponse = await http.post(
-            Uri.parse('$_ollamaBaseUrl/api/chat'),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'model': _ollamaModel,
-              'messages': [
-                {
-                  'role': 'system',
-                  'content':
-                      'You are a language assessment expert specializing in CEFR standards. Analyze the conversation and provide detailed reasoning about the user\'s language proficiency. Consider vocabulary range, grammatical accuracy, fluency, and complexity of language use. After your analysis, clearly state the CEFR level (A1, A2, B1, B2, C1, or C2) on a new line starting with "LEVEL:"',
-                },
-                {'role': 'user', 'content': assessmentPrompt},
-              ],
-              'stream': false,
-              'options': {'temperature': 0.3},
-            }),
-          );
-
-          if (assessmentResponse.statusCode == 200) {
-            final assessmentData = jsonDecode(assessmentResponse.body);
-            final aiAssessment = assessmentData['message']?['content'] ?? '';
-
-            // Store the full assessment result for the message store
-            _lastAssessmentResult = aiAssessment;
-            
-            // Extract the CEFR level
-            String assessedLevel = 'A1'; // Default level
-            final levelMatch = RegExp(r'LEVEL:\s*(A1|A2|B1|B2|C1|C2)').firstMatch(aiAssessment);
-            if (levelMatch != null) {
-              assessedLevel = levelMatch.group(1)!;
-            } else {
-              // Fallback to just finding any CEFR level mention
-              final simpleLevelMatch = RegExp(r'(A1|A2|B1|B2|C1|C2)').firstMatch(aiAssessment);
-              if (simpleLevelMatch != null) {
-                assessedLevel = simpleLevelMatch.group(0)!;
-              }
-            }
-
-            debugPrint('Background assessment complete: $assessedLevel');
-
-            // Format the current time
-            final now = DateTime.now();
-            final timestamp =
-                '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-
-            // Update the assessment log
-            _assessmentLog +=
-                '[$timestamp] Level: $assessedLevel - "${userMessage.length > 30 ? '${userMessage.substring(0, 30)}...' : userMessage}"\\n';
-
-            // Store the assessment result for debug viewing
-            _assessmentResults.add({
-              'timestamp': now.toString(),
-              'userMessage': userMessage,
-              'assistantMessage': assistantMessage,
-              'assessedLevel': assessedLevel,
-              'reasoning': aiAssessment,
-            });
-
-            // Save assessment results to persistent storage
-            _saveAssessmentResults();
-            // Limit stored results to last 50
-            if (_assessmentResults.length > 50) {
-              _assessmentResults.removeAt(0);
-            }
-
-            // Create an assessment message
-            _lastAssessmentMessage = processAssessmentResult(aiAssessment, assessedLevel);
-            
-            // Update the profile with the assessment result
-            if (_contextManager.isInitialized) {
-              await _contextManager.updateProfileWithSession(
-                conversation: 'User: $userMessage\nAssistant: $assistantMessage',
-                assessedLevel: assessedLevel,
-              );
-            }
-
-            // Notify listeners that we have new assessment data
-            notifyListeners();
+          // Assess level periodically
+          if (_messageCount % _levelAssessmentInterval == 0) {
+            await _assessLevel(userMessage, assistantMessage, targetLanguage);
           }
         } catch (e) {
           debugPrint('Error in background assessment: $e');
         }
+
+        // Small delay between assessments
+        await Future.delayed(const Duration(milliseconds: 500));
       }
-    } catch (e) {
-      debugPrint('Error starting assessment queue processing: $e');
     } finally {
-      _isAssessing = false;
-
-      // Process the next item in the queue if any
-      if (_pendingAssessments.isNotEmpty) {
-        await _processAssessmentQueue();
-      }
+      _isProcessing = false;
     }
   }
 
-  // Save assessment results to persistent storage
-  Future<void> _saveAssessmentResults() async {
+  /// Extract facts from conversation and store in profile
+  Future<void> _extractFacts(
+    String userMessage,
+    String assistantMessage,
+    String targetLanguage,
+  ) async {
+    debugPrint('Extracting facts from conversation...');
+
+    final prompt = '''Analyze this conversation and extract any personal facts about the student that could help personalize future conversations.
+
+Conversation:
+User: "$userMessage"
+Assistant: "$assistantMessage"
+
+Extract facts like:
+- Name, age, location
+- Family members (names, relationships)
+- Pets (names, types)
+- Hobbies, interests, sports
+- Job, studies, career
+- Preferences, favorites
+
+Return ONLY a JSON object with key-value pairs of facts. Use clear, descriptive keys (e.g., "student_name", "pet_dog_name", "hobby_guitar").
+If no new facts are found, return an empty JSON object: {}
+
+Example output:
+{"student_name": "Maria", "pet_cat_name": "Whiskers", "hobby_reading": "enjoys mystery novels"}''';
+
     try {
-      // Get application documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/assessment_results.json');
-
-      // Convert assessment results to JSON and save to file
-      final jsonData = jsonEncode(_assessmentResults);
-      await file.writeAsString(jsonData);
-
-      debugPrint('Assessment results saved to ${file.path}');
-    } catch (e) {
-      debugPrint('Error saving assessment results: $e');
-    }
-  }
-
-  // Load assessment results from persistent storage
-  Future<void> _loadAssessmentResults() async {
-    try {
-      // Get application documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/assessment_results.json');
-
-      // Check if file exists
-      if (await file.exists()) {
-        // Read file content and parse JSON
-        final jsonData = await file.readAsString();
-        final List<dynamic> data = jsonDecode(jsonData);
-
-        // Convert to List<Map<String, dynamic>>
-        _assessmentResults.clear();
-        _assessmentResults.addAll(data.map((item) => Map<String, dynamic>.from(item)).toList());
-
-        // Rebuild assessment log from loaded data
-        _rebuildAssessmentLog();
-
-        debugPrint('Loaded ${_assessmentResults.length} assessment results from ${file.path}');
+      final response = await _callOpenAI(prompt, 0.3);
+      
+      if (response.isNotEmpty) {
+        // Try to parse JSON
+        try {
+          // Extract JSON from response (might have extra text)
+          final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(response);
+          if (jsonMatch != null) {
+            final jsonStr = jsonMatch.group(0)!;
+            final facts = jsonDecode(jsonStr) as Map<String, dynamic>;
+            
+            if (facts.isNotEmpty) {
+              debugPrint('Extracted ${facts.length} facts: ${facts.keys.join(", ")}');
+              await _profileStore.setValues(facts);
+            } else {
+              debugPrint('No new facts extracted');
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing facts JSON: $e');
+        }
       }
     } catch (e) {
-      debugPrint('Error loading assessment results: $e');
+      debugPrint('Error extracting facts: $e');
     }
   }
 
-  // Rebuild assessment log from loaded assessment results
-  void _rebuildAssessmentLog() {
-    _assessmentLog = '';
-    for (final assessment in _assessmentResults) {
-      try {
-        final userMessage = assessment['userMessage'] ?? '';
-        final assessedLevel = assessment['assessedLevel'] ?? 'Unknown';
+  /// Assess language level based on recent conversation history
+  Future<void> _assessLevel(
+    String userMessage,
+    String assistantMessage,
+    String targetLanguage,
+  ) async {
+    debugPrint('Assessing language level...');
 
-        // Format timestamp
-        String timestamp = 'Unknown';
-        if (assessment['timestamp'] != null) {
-          final dateTime = DateTime.parse(assessment['timestamp'].toString());
-          timestamp =
-              '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
+    final prompt = '''Analyze the student's language proficiency in $targetLanguage based on this conversation:
+
+User: "$userMessage"
+Assistant: "$assistantMessage"
+
+Assess according to CEFR standards (A1-C2). Consider:
+- Vocabulary range and sophistication
+- Grammatical accuracy and complexity
+- Sentence structure variety
+- Fluency and coherence
+- Error patterns
+
+Provide:
+1. Brief analysis (2-3 sentences)
+2. CEFR level on a new line: "LEVEL: [A1|A2|B1|B2|C1|C2]"
+
+Focus on the user's actual language use, not the topic complexity.''';
+
+    try {
+      final response = await _callOpenAI(prompt, 0.3);
+      
+      if (response.isNotEmpty) {
+        // Extract CEFR level
+        final levelMatch = RegExp(r'LEVEL:\s*(A1|A2|B1|B2|C1|C2)', caseSensitive: false)
+            .firstMatch(response);
+        
+        String assessedLevel = 'A1';
+        if (levelMatch != null) {
+          assessedLevel = levelMatch.group(1)!.toUpperCase();
+        } else {
+          // Fallback: find any CEFR level mention
+          final simpleLevelMatch = RegExp(r'\b(A1|A2|B1|B2|C1|C2)\b')
+              .firstMatch(response);
+          if (simpleLevelMatch != null) {
+            assessedLevel = simpleLevelMatch.group(0)!;
+          }
         }
 
-        _assessmentLog +=
-            '[$timestamp] Level: $assessedLevel - "${userMessage.length > 30 ? '${userMessage.substring(0, 30)}...' : userMessage}"\\n';
-      } catch (e) {
-        debugPrint('Error rebuilding log entry: $e');
+        debugPrint('Assessed level: $assessedLevel');
+        
+        // Update level tracker
+        await _levelTracker.updateLevel(
+          assessedLevel,
+          response,
+          confidence: 0.7,
+        );
+
+        // Create assessment message
+        _lastAssessmentMessage = Message(
+          content: 'Level Assessment: $assessedLevel\n\n$response',
+          source: MessageSource.assessmentBot,
+          timestamp: DateTime.now(),
+        );
+
+        notifyListeners();
       }
+    } catch (e) {
+      debugPrint('Error assessing level: $e');
     }
+  }
+
+  /// Call OpenAI API
+  Future<String> _callOpenAI(String prompt, double temperature) async {
+    final response = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_apiKey',
+      },
+      body: jsonEncode({
+        'model': 'gpt-4o-mini',
+        'messages': [
+          {
+            'role': 'system',
+            'content': 'You are a language assessment expert. Be concise and precise.',
+          },
+          {'role': 'user', 'content': prompt},
+        ],
+        'temperature': temperature,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['choices'][0]['message']['content'] ?? '';
+    } else {
+      throw Exception('OpenAI API error: ${response.statusCode}');
+    }
+  }
+
+  /// Reset all assessment data
+  Future<void> reset() async {
+    await _profileStore.clearProfile();
+    await _levelTracker.reset();
+    _messageCount = 0;
+    _pendingAssessments.clear();
+    _lastAssessmentMessage = null;
+    notifyListeners();
   }
 }

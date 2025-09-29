@@ -11,7 +11,7 @@ class OpenAITtsService {
   final AudioPlayerService _audioPlayer = AudioPlayerService();
   bool _isSpeaking = false;
   String? _lastSpokenText;
-  String _currentVoice = 'alloy'; // Default OpenAI voice
+  String _currentVoice = 'nova'; // Default OpenAI voice
   PlaybackCompleteCallback? _onPlaybackComplete;
 
   // Available OpenAI TTS voices
