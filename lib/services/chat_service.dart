@@ -81,10 +81,13 @@ class ChatService extends ChangeNotifier {
       final prompt = context.isNotEmpty ? '$context\n\nUser: $message' : 'User: $message';
 
       // System prompt for language learning
-      final systemPrompt = 'You are a friendly language learning assistant for $_targetLanguage. '
-          'Respond in $_targetLanguage at a level appropriate for the student. '
-          'Keep responses concise and helpful for language learning. '
-          'If the user speaks in another language, gently encourage them to try in $_targetLanguage.';
+      final systemPrompt = 'You are a $_targetLanguage language teacher having a natural conversation with your student. '
+          'YOU lead the conversation - ask questions, introduce topics, and guide the discussion. '
+          'Respond ONLY in $_targetLanguage at a level appropriate for the student. '
+          'Be proactive: share interesting facts, ask about their day, suggest activities, or discuss topics. '
+          'Act like a real teacher who is genuinely interested in engaging the student, not a passive assistant waiting for commands. '
+          'Keep responses conversational and natural (2-3 sentences). '
+          'If the student speaks in another language, gently encourage them to try in $_targetLanguage.';
 
       // Call OpenAI API
       final assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);

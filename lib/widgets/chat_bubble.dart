@@ -46,15 +46,20 @@ class ChatBubble extends StatelessWidget {
             if (!isUser)
               Consumer<TtsService>(
                 builder: (context, ttsService, _) {
+                  // Check if THIS specific message is currently playing
+                  final isThisMessagePlaying = ttsService.isSpeaking && 
+                      ttsService.lastSpokenText != null &&
+                      ttsService.lastSpokenText!.contains(message.substring(0, message.length > 50 ? 50 : message.length));
+                  
                   return Align(
                     alignment: Alignment.centerRight,
                     child: IconButton(
                       icon: Icon(
-                        ttsService.isSpeaking 
-                            ? Icons.stop // Show stop icon when speaking
+                        isThisMessagePlaying 
+                            ? Icons.stop // Show stop icon when THIS message is speaking
                             : Icons.volume_up, // Show play icon when not speaking
                         size: 16,
-                        color: ttsService.isSpeaking 
+                        color: isThisMessagePlaying 
                             ? Theme.of(context).colorScheme.tertiary // Brighter when speaking
                             : Theme.of(context).colorScheme.tertiary.withOpacity(0.8), // Normal color
                       ),
@@ -65,9 +70,9 @@ class ChatBubble extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       iconSize: 16,
                       visualDensity: VisualDensity.compact,
-                      onPressed: ttsService.isSpeaking 
+                      onPressed: isThisMessagePlaying 
                           ? () {
-                              // Stop speaking if already speaking
+                              // Stop speaking if THIS message is playing
                               debugPrint('ChatBubble: Stopping TTS');
                               ttsService.stop();
                             }

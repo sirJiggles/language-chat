@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
@@ -39,7 +40,7 @@ class ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForInitialAssessment();
     });
-    
+
     // Listen to chat service changes to auto-scroll
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatService = Provider.of<ChatService>(context, listen: false);
@@ -64,7 +65,7 @@ class ChatScreenState extends State<ChatScreen> {
       // This helps with the first message audio playback
       debugPrint('Ensuring TTS is ready before first message...');
       await ttsService.initialize();
-      
+
       // Give a little more time for TTS to be fully ready
       await Future.delayed(const Duration(milliseconds: 300));
 
@@ -73,7 +74,7 @@ class ChatScreenState extends State<ChatScreen> {
       final chatService = Provider.of<ChatService>(context, listen: false);
       debugPrint('Sending initial greeting message');
       final response = await chatService.sendMessage('Hallo', hideUserMessage: true);
-      
+
       // Explicitly trigger TTS for the first message
       debugPrint('Explicitly speaking first message: "$response"');
       await Future.delayed(const Duration(milliseconds: 500)); // Give UI time to update
@@ -107,7 +108,7 @@ class ChatScreenState extends State<ChatScreen> {
     // Send the message
     final chatService = Provider.of<ChatService>(context, listen: false);
     final ttsService = Provider.of<TtsService>(context, listen: false);
-    
+
     final response = await chatService.sendMessage(text);
 
     // Speak the response
@@ -138,82 +139,91 @@ class ChatScreenState extends State<ChatScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'settings') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'debug') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DebugMenu()),
-                );
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings),
-                    SizedBox(width: 12),
-                    Text('Settings'),
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: AppBar(
+              backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+              elevation: 0,
+              actions: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'settings') {
+                      Navigator.of(
+                        context,
+                      ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    } else if (value == 'debug') {
+                      Navigator.of(
+                        context,
+                      ).push(MaterialPageRoute(builder: (_) => const DebugMenu()));
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'settings',
+                      child: Row(
+                        children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'debug',
+                      child: Row(
+                        children: [Icon(Icons.bug_report), SizedBox(width: 12), Text('Debug Menu')],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'debug',
-                child: Row(
-                  children: [
-                    Icon(Icons.bug_report),
-                    SizedBox(width: 12),
-                    Text('Debug Menu'),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: TiledBackground(
         assetPath: 'assets/tile.png',
         overlayOpacity: 0.2,
-        child: Column(
+        child: Stack(
           children: [
-            // Main chat content
-            Expanded(
-              child: Consumer<ChatService>(
-                builder: (context, chatService, _) {
-                  final messages = chatService.conversationStore.messages;
+            // Main chat content (full screen)
+            Consumer<ChatService>(
+              builder: (context, chatService, _) {
+                final messages = chatService.conversationStore.messages;
 
                   if (messages.isNotEmpty) {
                     final thinkingMessages = messages.where((msg) => msg.isThinking).toList();
                     final isThinking = thinkingMessages.isNotEmpty || chatService.isThinking;
-                    
-                    final visibleMessages = messages.where((msg) => 
-                      !msg.isThinking &&
-                      !msg.content.contains('<thinking id=') &&
-                      msg.content.isNotEmpty
-                    ).toList();
-                    
+
+                    final visibleMessages = messages
+                        .where(
+                          (msg) =>
+                              !msg.isThinking &&
+                              !msg.content.contains('<thinking id=') &&
+                              msg.content.isNotEmpty,
+                        )
+                        .toList();
+
                     // Schedule a scroll to bottom after the UI updates
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       _scrollToBottom();
                     });
-                    
+
                     return ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.all(16.0),
+                      padding: EdgeInsets.only(
+                        top: kToolbarHeight + 16,
+                        left: 10.0,
+                        right: 10.0,
+                        bottom: 80.0, // Extra padding for frosted glass bottom bar
+                      ),
                       itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                       itemBuilder: (context, index) {
                         if (isThinking && index == visibleMessages.length) {
                           return const ThinkingBubble();
                         }
-                        
+
                         final message = visibleMessages[index];
                         return ChatBubble(message: message.content, isUser: message.isUser);
                       },
@@ -250,55 +260,68 @@ class ChatScreenState extends State<ChatScreen> {
                   }
                 },
               ),
-            ),
-
-            // Live transcription preview
-            const TranscriptionPreview(cancelRecording: false),
-
-            // WhatsApp-style bottom input area
-            Container(
-              padding: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, bottomPadding + 8.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            
+            // Bottom elements positioned at the bottom
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Text input field
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                  // Live transcription preview
+                  const TranscriptionPreview(cancelRecording: false),
+
+                  // WhatsApp-style bottom input area with frosted glass
+                  ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                        padding: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, bottomPadding + 8.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Text input field
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _textController,
-                        style: const TextStyle(color: Colors.black87),
-                        decoration: const InputDecoration(
-                          hintText: 'Message',
-                          hintStyle: TextStyle(color: Colors.black38),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
+                          child: TextField(
+                            controller: _textController,
+                            style: const TextStyle(color: Colors.black87),
+                            decoration: const InputDecoration(
+                              hintText: 'Message',
+                              hintStyle: TextStyle(color: Colors.black38),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            maxLines: null,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _sendTextMessage(),
                           ),
                         ),
-                        maxLines: null,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _sendTextMessage(),
+                      ),
+                      const SizedBox(width: 8),
+                      // Mic button - smaller and without background
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: MicButton(onScrollToBottom: _scrollToBottom),
+                      ),
+                    ],
+                  ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Mic button - smaller and without background
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: MicButton(onScrollToBottom: _scrollToBottom),
                   ),
                 ],
               ),
