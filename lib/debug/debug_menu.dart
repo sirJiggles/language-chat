@@ -7,6 +7,7 @@ import '../services/chat_service.dart';
 import 'assessment_view.dart';
 import 'assessment_thinking_viewer.dart';
 import '../screens/assessment_screen.dart';
+import 'message_debug_view.dart';
 
 /// A debug menu to access debugging tools
 class DebugMenu extends StatelessWidget {
@@ -92,6 +93,14 @@ class DebugMenu extends StatelessWidget {
                   subtitle: const Text('View assessments with the new message model'),
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.message),
+                  title: const Text('Message Debug View'),
+                  subtitle: const Text('Inspect all messages in the conversation store'),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MessageDebugView()));
                   },
                 ),
                 ListTile(

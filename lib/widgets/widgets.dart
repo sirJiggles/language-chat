@@ -6,3 +6,4 @@ export 'nav_buttons.dart';
 export 'thinking_dots.dart';
 export 'transcription_preview.dart';
 export 'tiled_background.dart';
+export 'sound_wave_animation.dart';

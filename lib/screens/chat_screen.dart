@@ -7,7 +7,6 @@ import '../services/context_manager.dart';
 import '../widgets/widgets.dart';
 import '../screens/settings_screen.dart';
 import '../debug/debug_menu.dart';
-import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -39,24 +38,45 @@ class ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForInitialAssessment();
     });
+    
+    // Listen to chat service changes to auto-scroll
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatService = Provider.of<ChatService>(context, listen: false);
+      chatService.addListener(_handleChatServiceUpdate);
+    });
   }
 
   // Start the conversation with the bot greeting automatically
   Future<void> _checkForInitialAssessment() async {
     final contextManager = Provider.of<ContextManager>(context, listen: false);
+    final ttsService = Provider.of<TtsService>(context, listen: false);
 
     // Wait a moment to ensure the context manager is fully initialized
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 800));
 
     if (contextManager.isInitialized && !_botGreetingSent) {
       setState(() {
         _botGreetingSent = true;
       });
 
+      // Ensure TTS is fully initialized before sending the first message
+      // This helps with the first message audio playback
+      debugPrint('Ensuring TTS is ready before first message...');
+      await ttsService.initialize();
+      
+      // Give a little more time for TTS to be fully ready
+      await Future.delayed(const Duration(milliseconds: 300));
+
       // Start the conversation with an empty message to trigger the AI's initial greeting
       // Hide this message from the conversation display
       final chatService = Provider.of<ChatService>(context, listen: false);
-      await chatService.sendMessage('Hallo', hideUserMessage: true);
+      debugPrint('Sending initial greeting message');
+      final response = await chatService.sendMessage('Hallo', hideUserMessage: true);
+      
+      // Explicitly trigger TTS for the first message
+      debugPrint('Explicitly speaking first message: "$response"');
+      await Future.delayed(const Duration(milliseconds: 500)); // Give UI time to update
+      await ttsService.speak(response);
     }
   }
 
@@ -68,8 +88,19 @@ class ChatScreenState extends State<ChatScreen> {
     await ttsService.initialize();
   }
 
+  // Handle chat service updates
+  void _handleChatServiceUpdate() {
+    // Schedule a scroll to bottom after the UI updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+  }
+
   @override
   void dispose() {
+    // Remove listener when disposing
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    chatService.removeListener(_handleChatServiceUpdate);
     _scrollController.dispose();
     super.dispose();
   }
@@ -97,28 +128,39 @@ class ChatScreenState extends State<ChatScreen> {
 
                   if (messages.isNotEmpty) {
                     // First check if there's a thinking message that should be shown
-                    final thinkingMessage = messages.lastWhere(
-                      (msg) => msg.isThinking,
-                      orElse: () => Message(content: '', source: MessageSource.system),
-                    );
+                    final thinkingMessages = messages.where((msg) => msg.isThinking).toList();
+                    final isThinking = thinkingMessages.isNotEmpty || chatService.isThinking;
                     
-                    // Filter out messages with <think> tags and thinking messages
+                    // Debug thinking state
+                    debugPrint('Chat screen thinking state: ${thinkingMessages.length} thinking messages, chatService.isThinking=${chatService.isThinking}');
+                    
+                    // Filter out thinking messages but keep regular bot messages
                     final visibleMessages = messages.where((msg) => 
                       !msg.isThinking &&
-                      !msg.content.contains('<think>') && 
-                      !msg.content.contains('</think>') &&
                       !msg.content.contains('<thinking id=') &&
                       msg.content.isNotEmpty
                     ).toList();
+                    
+                    // Debug what messages are being filtered
+                    debugPrint('Total messages: ${messages.length}, Visible messages: ${visibleMessages.length}');
+                    for (var i = 0; i < messages.length; i++) {
+                      debugPrint('Message $i: ${messages[i].source}, isThinking: ${messages[i].isThinking}, content: ${messages[i].content.substring(0, messages[i].content.length > 20 ? 20 : messages[i].content.length)}...');
+                    }
+                    
+                    // Schedule a scroll to bottom after the UI updates
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToBottom();
+                    });
                     
                     return ListView.builder(
                       controller: _scrollController,
                       // Add padding at the bottom to ensure messages aren't hidden behind controls
                       padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, controlsHeight),
-                      itemCount: thinkingMessage.isThinking ? visibleMessages.length + 1 : visibleMessages.length,
+                      itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                       itemBuilder: (context, index) {
-                        // Show thinking bubble as the last item if there's a thinking message
-                        if (thinkingMessage.isThinking && index == visibleMessages.length) {
+                        // Show thinking bubble as the last item if we're in thinking state
+                        if (isThinking && index == visibleMessages.length) {
+                          debugPrint('Rendering thinking bubble');
                           return const ThinkingBubble();
                         }
                         

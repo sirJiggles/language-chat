@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'screens/chat_screen.dart';
@@ -7,18 +8,39 @@ import 'services/speech_service.dart';
 import 'services/tts_service.dart';
 import 'services/context_manager.dart';
 import 'services/assessment_service.dart';
+import 'models/settings_model.dart';
 
 void main() async {
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set up error handling
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter error: ${details.exception}');
+  };
+  
+  // Initialize platform channels early
+  try {
+    const platform = MethodChannel('com.language_learning_chat/audio_player');
+    await platform.invokeMethod('initialize');
+  } catch (e) {
+    // Ignore errors, this is just to ensure the channel is registered
+    debugPrint('Audio player initialization: $e');
+  }
 
   // Initialize context manager first
   final contextManager = ContextManager();
   await contextManager.initialize();
+  
+  // Initialize settings model
+  final settingsModel = SettingsModel();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: contextManager),
+        ChangeNotifierProvider.value(value: settingsModel),
 
         // Create assessment service
         ChangeNotifierProvider(
@@ -52,10 +74,23 @@ void main() async {
             ),
             contextManager: contextManager,
             assessmentService: Provider.of<AssessmentService>(context, listen: false),
+            settingsModel: settingsModel,
+            openaiApiKey: const String.fromEnvironment(
+              'OPENAI_API_KEY',
+              defaultValue: '',
+            ),
           ),
         ),
         ChangeNotifierProvider(create: (_) => SpeechService()),
-        ChangeNotifierProvider(create: (_) => TtsService()),
+        ChangeNotifierProvider(
+          create: (context) => TtsService(
+            settingsModel: settingsModel,
+            openaiApiKey: const String.fromEnvironment(
+              'OPENAI_API_KEY',
+              defaultValue: '',
+            ),
+          ),
+        ),
       ],
       child: const MyApp(),
     ),

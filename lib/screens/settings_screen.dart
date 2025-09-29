@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/tts_service.dart';
+import '../models/settings_model.dart';
+import '../services/openai_tts_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -20,14 +22,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _selectedLanguage = 'German';
   String _selectedVoiceName = '';
+  ChatProvider _selectedChatProvider = ChatProvider.ollama;
+  TtsProvider _selectedTtsProvider = TtsProvider.system;
+  String _selectedOpenAIVoice = 'alloy';
 
   @override
   void initState() {
     super.initState();
     final chat = context.read<ChatService>();
     final tts = context.read<TtsService>();
+    final settings = context.read<SettingsModel>();
     _selectedLanguage = chat.targetLanguage;
     _selectedVoiceName = tts.voiceName;
+    _selectedChatProvider = settings.chatProvider;
+    _selectedTtsProvider = settings.ttsProvider;
+    _selectedOpenAIVoice = settings.openaiTtsVoice;
   }
 
   @override
@@ -85,6 +94,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text('Chat Provider', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<ChatProvider>(
+            value: _selectedChatProvider,
+            items: const [
+              DropdownMenuItem(value: ChatProvider.ollama, child: Text('Ollama (Local)')),
+              DropdownMenuItem(value: ChatProvider.chatgpt, child: Text('ChatGPT')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedChatProvider = value);
+              }
+            },
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0), // Primary blue
+              ),
+            ),
+            dropdownColor: const Color(0xFF1E1E1E), // Dark background
+            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+          ),
+          const SizedBox(height: 16),
+          
+          Text('Text-to-Speech Provider', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<TtsProvider>(
+            value: _selectedTtsProvider,
+            items: const [
+              DropdownMenuItem(value: TtsProvider.system, child: Text('System (Default)')),
+              DropdownMenuItem(value: TtsProvider.openai, child: Text('OpenAI (Premium)')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedTtsProvider = value);
+              }
+            },
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+              ),
+            ),
+            dropdownColor: const Color(0xFF1E1E1E),
+            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+          ),
+          const SizedBox(height: 16),
+          
+          if (_selectedTtsProvider == TtsProvider.openai) ...[  
+            Text('OpenAI Voice', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedOpenAIVoice,
+              items: OpenAITtsService.availableVoices.map((voice) => 
+                DropdownMenuItem(
+                  value: voice['id'],
+                  child: Text('${voice['name']} - ${voice['description']}'),
+                )
+              ).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedOpenAIVoice = value);
+                }
+              },
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                focusedBorder: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+                ),
+              ),
+              dropdownColor: const Color(0xFF1E1E1E),
+              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+            ),
+            const SizedBox(height: 12),
+            Consumer<TtsService>(
+              builder: (context, tts, _) {
+                return OutlinedButton.icon(
+                  onPressed: tts.isSpeaking 
+                    ? null // Disable when speaking
+                    : () async {
+                        try {
+                          // Show loading indicator
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Loading voice preview...'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                          
+                          // Apply the voice and preview it
+                          tts.setOpenAIVoice(_selectedOpenAIVoice);
+                          await tts.previewVoice(_selectedOpenAIVoice, _selectedLanguage);
+                        } catch (e) {
+                          // Show error message
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error previewing voice: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                  icon: tts.isSpeaking
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.volume_up),
+                  label: Text(tts.isSpeaking ? 'Playing...' : 'Preview OpenAI Voice'),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+          
           Text('Target Language', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
@@ -156,10 +279,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _apply() {
     final chat = context.read<ChatService>();
     final tts = context.read<TtsService>();
+    final settings = context.read<SettingsModel>();
 
     chat.setTargetLanguage(_selectedLanguage);
     tts.setPreferredLanguage(_selectedLanguage);
     tts.setVoiceName(_selectedVoiceName);
+    settings.setChatProvider(_selectedChatProvider);
+    
+    // Apply TTS provider settings
+    tts.setTtsProvider(_selectedTtsProvider);
+    if (_selectedTtsProvider == TtsProvider.openai) {
+      tts.setOpenAIVoice(_selectedOpenAIVoice);
+    }
 
     // Also map this voice as default for the selected language
     final code = _langToCode(_selectedLanguage);

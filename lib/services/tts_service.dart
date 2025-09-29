@@ -2,11 +2,33 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/settings_model.dart';
+import 'openai_tts_service.dart';
 
 class TtsService extends ChangeNotifier {
   final FlutterTts _flutterTts = FlutterTts();
+  OpenAITtsService? _openAITts;
+  final SettingsModel _settingsModel;
   bool _isSpeaking = false;
   String? _lastSpokenText;
+  
+  TtsService({required SettingsModel settingsModel, String? openaiApiKey}) : _settingsModel = settingsModel {
+    // Initialize OpenAI TTS if API key is provided
+    if (openaiApiKey != null && openaiApiKey.isNotEmpty) {
+      _openAITts = OpenAITtsService(apiKey: openaiApiKey);
+      if (_settingsModel.ttsProvider == TtsProvider.openai) {
+        _openAITts!.setVoice(_settingsModel.openaiTtsVoice);
+      }
+      _openAIVoices = _openAITts!.voices;
+      
+      // Set up completion callback
+      _openAITts!.onPlaybackComplete = () {
+        _isSpeaking = false;
+        notifyListeners();
+        debugPrint('TTS Service: OpenAI playback completed, notifying listeners');
+      };
+    }
+  }
 
   // Env-driven defaults
   static const String _envTargetLanguage = String.fromEnvironment('TARGET_LANGUAGE', defaultValue: 'Spanish');
@@ -16,6 +38,9 @@ class TtsService extends ChangeNotifier {
   String _preferredLanguage = _envTargetLanguage;
   List<Map<String, String>> _availableVoices = const [];
   final Map<String, String> _preferredVoicesByLang = {}; // langCode -> voiceName
+  
+  // OpenAI TTS settings
+  List<Map<String, String>> _openAIVoices = const [];
 
   // Keys for shared preferences
   static const String _keyVoiceName = 'tts_voice_name';
@@ -32,6 +57,11 @@ class TtsService extends ChangeNotifier {
   Future<void> initialize() async {
     // Load saved settings
     await _loadSettings();
+    
+    // Initialize OpenAI TTS if API key is provided
+    if (_settingsModel.ttsProvider == TtsProvider.openai) {
+      _initializeOpenAITts();
+    }
     
     // Pick a suitable locale (language-region) based on TARGET_LANGUAGE
     final locale = _mapTargetLanguageToLocale(_preferredLanguage);
@@ -110,10 +140,11 @@ class TtsService extends ChangeNotifier {
       debugPrint('Error initializing TTS voices: $e');
     }
 
-    // Set up completion listener
+    // Set up completion listener for system TTS
     _flutterTts.setCompletionHandler(() {
       _isSpeaking = false;
       notifyListeners();
+      debugPrint('TTS Service: System TTS playback completed, notifying listeners');
     });
   }
 
@@ -149,50 +180,120 @@ class TtsService extends ChangeNotifier {
   }
 
   Future<void> speak(String text) async {
-    if (text.isEmpty) return;
+    debugPrint('TTS Service: speak method called with text length ${text.length}');
+    if (text.isEmpty) {
+      debugPrint('TTS Service: Empty text, not speaking');
+      return;
+    }
     
     // Skip if already speaking
     if (_isSpeaking) {
+      debugPrint('TTS Service: Already speaking, stopping first');
       await stop();
+      // Small delay to ensure stop completes
+      await Future.delayed(const Duration(milliseconds: 100));
     }
 
     // Check if we should speak this text (e.g., not just emojis)
     if (!_shouldSpeak(text)) {
-      debugPrint('Skipping TTS for text that should not be spoken: $text');
+      debugPrint('TTS Service: Skipping TTS for text that should not be spoken: $text');
       return;
     }
 
     // Clean up text for better TTS
     final cleanText = _stripEmojis(text);
+    debugPrint('TTS Service: Speaking cleaned text of length ${cleanText.length}');
     
     _lastSpokenText = cleanText;
     _isSpeaking = true;
     notifyListeners();
+    debugPrint('TTS Service: Set isSpeaking=true and notified listeners');
     
     try {
-      await _flutterTts.speak(cleanText);
+      // Use OpenAI TTS if selected and available
+      if (_settingsModel.ttsProvider == TtsProvider.openai && _openAITts != null) {
+        debugPrint('TTS Service: Using OpenAI TTS provider');
+        await _openAITts!.speak(cleanText);
+        debugPrint('TTS Service: OpenAI TTS speak method returned');
+        // Completion will be handled by the callback we set up in the constructor
+      } else {
+        // Use system TTS
+        debugPrint('TTS Service: Using system TTS provider');
+        await _flutterTts.speak(cleanText);
+        debugPrint('TTS Service: System TTS speak method returned');
+        // Completion will be handled by the completion handler we set up in initialize()
+      }
     } catch (e) {
-      debugPrint('Error speaking text: $e');
+      debugPrint('TTS Service: Error speaking text: $e');
       _isSpeaking = false;
       notifyListeners();
     }
   }
 
   Future<void> stop() async {
+    debugPrint('TTS Service: stop method called, isSpeaking=$_isSpeaking');
     if (_isSpeaking) {
-      await _flutterTts.stop();
+      if (_settingsModel.ttsProvider == TtsProvider.openai && _openAITts != null) {
+        debugPrint('TTS Service: Stopping OpenAI TTS');
+        await _openAITts!.stop();
+      } else {
+        debugPrint('TTS Service: Stopping system TTS');
+        await _flutterTts.stop();
+      }
       _isSpeaking = false;
+      debugPrint('TTS Service: Set isSpeaking=false and notifying listeners');
       notifyListeners();
+    } else {
+      debugPrint('TTS Service: Not speaking, no need to stop');
     }
   }
 
   @override
   void dispose() {
     _flutterTts.stop();
+    _openAITts?.dispose();
     super.dispose();
   }
 
   // ----------------------- helpers -----------------------
+  
+  void _initializeOpenAITts() {
+    // If OpenAI TTS is already initialized, just update the voice
+    if (_openAITts != null) {
+      _openAITts!.setVoice(_settingsModel.openaiTtsVoice);
+      return;
+    }
+    
+    // Otherwise try to initialize with environment variable
+    final apiKey = const String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
+    if (apiKey.isNotEmpty) {
+      _openAITts = OpenAITtsService(apiKey: apiKey);
+      _openAITts!.setVoice(_settingsModel.openaiTtsVoice);
+      _openAIVoices = _openAITts!.voices;
+    } else {
+      debugPrint('Warning: OpenAI TTS provider selected but no API key available');
+    }
+  }
+  
+  void setTtsProvider(TtsProvider provider) {
+    _settingsModel.setTtsProvider(provider);
+    
+    if (provider == TtsProvider.openai && _openAITts == null) {
+      _initializeOpenAITts();
+    }
+    
+    notifyListeners();
+  }
+  
+  void setOpenAIVoice(String voiceId) {
+    _settingsModel.setOpenAITtsVoice(voiceId);
+    if (_openAITts != null) {
+      _openAITts!.setVoice(voiceId);
+    }
+    notifyListeners();
+  }
+  
+  List<Map<String, String>> get openAIVoices => _openAIVoices;
   void setVoiceName(String name) {
     _voiceName = name;
     // Apply immediately if possible
@@ -228,10 +329,25 @@ class TtsService extends ChangeNotifier {
   }
 
   Future<void> previewVoice(String voiceName, String languageName) async {
-    final lang = _mapTargetLanguageToLocale(languageName);
-    await _flutterTts.setLanguage(lang);
-    await _applyVoiceByName(voiceName);
-    await _flutterTts.speak('This is a preview.');
+    if (_settingsModel.ttsProvider == TtsProvider.openai) {
+      if (_openAITts == null) {
+        debugPrint('Initializing OpenAI TTS for preview');
+        _initializeOpenAITts();
+      }
+      
+      if (_openAITts != null) {
+        debugPrint('Previewing OpenAI voice: $voiceName');
+        _openAITts!.setVoice(voiceName);
+        await _openAITts!.speak('This is a preview of the $voiceName voice.');
+      } else {
+        debugPrint('Error: Could not initialize OpenAI TTS for preview');
+      }
+    } else {
+      final lang = _mapTargetLanguageToLocale(languageName);
+      await _flutterTts.setLanguage(lang);
+      await _applyVoiceByName(voiceName);
+      await _flutterTts.speak('This is a preview.');
+    }
   }
   
   String _mapTargetLanguageToLocale(String language) {

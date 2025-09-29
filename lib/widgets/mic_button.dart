@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
+import 'sound_wave_animation.dart';
 
 class MicButton extends StatefulWidget {
   final Function() onScrollToBottom;
@@ -29,12 +30,12 @@ class _MicButtonState extends State<MicButton> {
             final bgColor = isListening
                 ? (_cancelRecording
                       ? Colors.grey.shade400.withOpacity(0.8)
-                      : Colors.red.withOpacity(0.8))
-                : (isSpeaking ? Colors.red.withOpacity(0.8) : Colors.transparent);
+                      : Theme.of(context).colorScheme.primary.withOpacity(0.8))
+                : (isSpeaking ? Theme.of(context).colorScheme.primary.withOpacity(0.8) : Colors.transparent);
             final borderColor = isListening
-                ? (_cancelRecording ? Colors.grey.withOpacity(0.9) : Colors.red.withOpacity(0.9))
+                ? (_cancelRecording ? Colors.grey.withOpacity(0.9) : Theme.of(context).colorScheme.primary.withOpacity(0.9))
                 : (isSpeaking
-                      ? Colors.red.withOpacity(0.9)
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.9)
                       : Theme.of(context).colorScheme.primary.withOpacity(0.8));
             final iconColor = (isListening || isSpeaking)
                 ? Colors.white
@@ -72,13 +73,31 @@ class _MicButtonState extends State<MicButton> {
                       try {
                         // Make sure the response is a valid string that can be spoken
                         final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
-                        await context.read<TtsService>().speak(cleanResponse);
+                        debugPrint('MicButton: Speaking response: "${cleanResponse.substring(0, cleanResponse.length > 30 ? 30 : cleanResponse.length)}..."');
+                        
+                        // Get TTS service and ensure it's ready
+                        final ttsService = context.read<TtsService>();
+                        
+                        // Stop any ongoing speech first
+                        if (ttsService.isSpeaking) {
+                          debugPrint('MicButton: Stopping ongoing speech before starting new one');
+                          await ttsService.stop();
+                          // Small delay to ensure stop completes
+                          await Future.delayed(const Duration(milliseconds: 100));
+                        }
+                        
+                        // Speak the response
+                        debugPrint('MicButton: Calling TTS service speak method');
+                        await ttsService.speak(cleanResponse);
+                        debugPrint('MicButton: TTS speak method returned');
                       } catch (e) {
                         debugPrint('Error speaking response: $e');
                         // Try to stop any ongoing TTS that might be causing issues
                         try {
                           await context.read<TtsService>().stop();
-                        } catch (_) {}
+                        } catch (stopError) {
+                          debugPrint('Error stopping TTS: $stopError');
+                        }
                       }
                     }
 
@@ -142,11 +161,23 @@ class _MicButtonState extends State<MicButton> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Icon(
-                      isSpeaking ? Icons.stop : (isListening ? Icons.mic : Icons.mic_none),
-                      size: 32, // Slightly smaller
-                      color: iconColor,
-                    ),
+                    // Show sound wave animation when bot is talking, otherwise show mic icon
+                    isSpeaking 
+                      ? SoundWaveAnimation(
+                          color: Colors.white,
+                          size: 48,
+                          barCount: 9,
+                          barWidth: 2.0,
+                          barSpacing: 2.0,
+                          minBarHeight: 2.0,
+                          maxBarHeight: 18.0,
+                          animationDuration: const Duration(milliseconds: 200),
+                        )
+                      : Icon(
+                          isListening ? Icons.mic : Icons.mic_none,
+                          size: 32, // Slightly smaller
+                          color: iconColor,
+                        ),
                     if (_cancelRecording && isListening)
                       const Positioned(
                         bottom: 10,
