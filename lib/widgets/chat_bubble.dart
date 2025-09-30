@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/tts_service.dart';
+import '../services/word_definition_service.dart';
+import 'selectable_word_text.dart';
 
 class ChatBubble extends StatelessWidget {
   final String message;
@@ -34,14 +36,23 @@ class ChatBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              message,
-              style: TextStyle(
-                color: isUser
-                    ? Colors.white
-                    : Colors.white.withOpacity(0.9),
-              ),
-            ),
+            // Use selectable word text for bot messages, regular text for user messages
+            isUser
+                ? Text(
+                    message,
+                    style: const TextStyle(color: Colors.white),
+                  )
+                : Consumer<WordDefinitionService>(
+                    builder: (context, definitionService, _) {
+                      return SelectableWordText(
+                        text: message,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                        definitionService: definitionService,
+                      );
+                    },
+                  ),
             // Add play button for bot messages only
             if (!isUser)
               Consumer<TtsService>(

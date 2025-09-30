@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _selectedLanguage = 'German';
   String _selectedOpenAIVoice = 'nova';
+  String _selectedNativeLanguage = 'English';
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = context.read<SettingsModel>();
     _selectedLanguage = chat.targetLanguage;
     _selectedOpenAIVoice = settings.openaiTtsVoice;
+    _selectedNativeLanguage = settings.nativeLanguage;
   }
 
   @override
@@ -60,6 +62,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) {
               if (value != null) {
                 setState(() => _selectedLanguage = value);
+              }
+            },
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+              ),
+            ),
+            dropdownColor: const Color(0xFF1E1E1E),
+            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+          ),
+          const SizedBox(height: 24),
+          
+          // Native Language Section
+          Text('Native Language', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _selectedNativeLanguage,
+            items: kLanguages.map((lang) => 
+              DropdownMenuItem(value: lang, child: Text(lang))
+            ).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedNativeLanguage = value);
               }
             },
             decoration: InputDecoration(
@@ -263,6 +289,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Apply language
     chat.setTargetLanguage(_selectedLanguage);
     tts.setPreferredLanguage(_selectedLanguage);
+    
+    // Apply native language
+    settings.setNativeLanguage(_selectedNativeLanguage);
     
     // Apply OpenAI voice (always using OpenAI TTS now)
     tts.setTtsProvider(TtsProvider.openai);

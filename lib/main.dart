@@ -8,6 +8,7 @@ import 'services/speech_service.dart';
 import 'services/tts_service.dart';
 import 'services/context_manager.dart';
 import 'services/assessment_service.dart';
+import 'services/word_definition_service.dart';
 import 'models/settings_model.dart';
 import 'models/student_profile_store.dart';
 import 'models/language_level_tracker.dart';
@@ -51,6 +52,14 @@ void main() async {
   // Create conversation archive store
   final archiveStore = ConversationArchiveStore();
   await archiveStore.initialize();
+  
+  // Create word definition service
+  final wordDefinitionService = WordDefinitionService(
+    openaiApiKey: const String.fromEnvironment(
+      'OPENAI_API_KEY',
+      defaultValue: '',
+    ),
+  );
 
   // Connect the new stores to the context manager
   contextManager.setStores(
@@ -66,6 +75,7 @@ void main() async {
         ChangeNotifierProvider.value(value: profileStore),
         ChangeNotifierProvider.value(value: levelTracker),
         ChangeNotifierProvider.value(value: archiveStore),
+        Provider.value(value: wordDefinitionService),
 
         // Create assessment service with new architecture
         ChangeNotifierProvider(

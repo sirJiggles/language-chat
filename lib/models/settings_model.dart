@@ -9,12 +9,15 @@ enum TtsProvider {
 class SettingsModel extends ChangeNotifier {
   static const String _ttsProviderKey = 'tts_provider';
   static const String _openaiTtsVoiceKey = 'openai_tts_voice';
+  static const String _nativeLanguageKey = 'native_language';
   
   TtsProvider _ttsProvider = TtsProvider.openai; // Default to OpenAI
   String _openaiTtsVoice = 'nova'; // Default OpenAI voice
+  String _nativeLanguage = 'English'; // Default native language
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
+  String get nativeLanguage => _nativeLanguage;
   
   SettingsModel() {
     _loadSettings();
@@ -42,6 +45,12 @@ class SettingsModel extends ChangeNotifier {
       _openaiTtsVoice = openaiVoice;
     }
     
+    // Load native language
+    final nativeLang = prefs.getString(_nativeLanguageKey);
+    if (nativeLang != null && nativeLang.isNotEmpty) {
+      _nativeLanguage = nativeLang;
+    }
+    
     notifyListeners();
   }
   
@@ -62,6 +71,17 @@ class SettingsModel extends ChangeNotifier {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_openaiTtsVoiceKey, voice);
+      
+      notifyListeners();
+    }
+  }
+  
+  Future<void> setNativeLanguage(String language) async {
+    if (_nativeLanguage != language) {
+      _nativeLanguage = language;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_nativeLanguageKey, language);
       
       notifyListeners();
     }
