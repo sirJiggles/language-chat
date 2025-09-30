@@ -33,12 +33,6 @@ class SpeechService extends ChangeNotifier {
     _lastWords = '';
     _error = '';
 
-    // Double-check the current locale before starting
-    if (_speech.isAvailable) {
-      var currentLocale = await _speech.systemLocale();
-      debugPrint('SpeechService: Current system locale before listen: ${currentLocale?.localeId}');
-    }
-
     await _speech.listen(
       onResult: (result) {
         _lastWords = result.recognizedWords;

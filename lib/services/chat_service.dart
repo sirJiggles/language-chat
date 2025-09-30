@@ -97,21 +97,8 @@ class ChatService extends ChangeNotifier {
       // Call OpenAI API
       final assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);
 
-      // Remove the thinking message
-      _conversationStore.removeThinking();
-      _isThinking = false;
-      _thinkingMessageId = '';
-
-      // Add the response to conversation
-      if (assistantMessage.isNotEmpty) {
-        _conversationStore.addMessage(
-          Message(content: assistantMessage, source: MessageSource.conversationBot),
-        );
-      }
-      
-      // Ensure UI updates
-      notifyListeners();
-
+      // Store the response but keep thinking indicator for now
+      // It will be removed when audio starts or immediately if audio is disabled
       _lastResponse = assistantMessage;
 
       // Perform background assessment - use the original message for assessment
@@ -229,6 +216,25 @@ class ChatService extends ChangeNotifier {
   void clearAssessment() {
     _assessmentStore.clear();
     notifyListeners();
+  }
+
+  /// Reveal the bot's message (remove thinking indicator and show text)
+  /// Call this when audio starts playing or immediately if audio is disabled
+  void revealBotMessage() {
+    if (_isThinking && _lastResponse.isNotEmpty) {
+      // Remove thinking message
+      _conversationStore.removeThinking();
+      _isThinking = false;
+      _thinkingMessageId = '';
+
+      // Add the actual response
+      _conversationStore.addMessage(
+        Message(content: _lastResponse, source: MessageSource.conversationBot),
+      );
+      
+      notifyListeners();
+      debugPrint('Bot message revealed: $_lastResponse');
+    }
   }
 
   /// Archive current conversation and start a new one

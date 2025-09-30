@@ -10,14 +10,17 @@ class SettingsModel extends ChangeNotifier {
   static const String _ttsProviderKey = 'tts_provider';
   static const String _openaiTtsVoiceKey = 'openai_tts_voice';
   static const String _nativeLanguageKey = 'native_language';
+  static const String _audioEnabledKey = 'audio_enabled';
   
   TtsProvider _ttsProvider = TtsProvider.openai; // Default to OpenAI
   String _openaiTtsVoice = 'nova'; // Default OpenAI voice
   String _nativeLanguage = 'English'; // Default native language
+  bool _audioEnabled = true; // Default audio on
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
   String get nativeLanguage => _nativeLanguage;
+  bool get audioEnabled => _audioEnabled;
   
   SettingsModel() {
     _loadSettings();
@@ -51,6 +54,9 @@ class SettingsModel extends ChangeNotifier {
       _nativeLanguage = nativeLang;
     }
     
+    // Load audio enabled
+    _audioEnabled = prefs.getBool(_audioEnabledKey) ?? true;
+    
     notifyListeners();
   }
   
@@ -82,6 +88,17 @@ class SettingsModel extends ChangeNotifier {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_nativeLanguageKey, language);
+      
+      notifyListeners();
+    }
+  }
+  
+  Future<void> setAudioEnabled(bool enabled) async {
+    if (_audioEnabled != enabled) {
+      _audioEnabled = enabled;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_audioEnabledKey, enabled);
       
       notifyListeners();
     }

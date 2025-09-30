@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/conversation_archive.dart';
-import '../screens/archive_screen.dart';
+import 'chat_bubble.dart';
 
 class ChatDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
@@ -107,7 +107,7 @@ class ChatDrawer extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ArchiveScreen(),
+        builder: (_) => _ArchiveDetailScreen(archive: archive),
       ),
     );
   }
@@ -195,5 +195,32 @@ class _ArchiveListTile extends StatelessWidget {
     } else {
       return '${date.month}/${date.day}/${date.year}';
     }
+  }
+}
+
+// Archive detail screen
+class _ArchiveDetailScreen extends StatelessWidget {
+  final ArchivedConversation archive;
+
+  const _ArchiveDetailScreen({required this.archive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(archive.title),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: archive.messages.length,
+        itemBuilder: (context, index) {
+          final message = archive.messages[index];
+          return ChatBubble(
+            message: message.content,
+            isUser: message.isUser,
+          );
+        },
+      ),
+    );
   }
 }

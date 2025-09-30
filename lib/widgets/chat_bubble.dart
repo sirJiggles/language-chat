@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/settings_model.dart';
 import '../services/tts_service.dart';
 import '../services/word_definition_service.dart';
 import 'selectable_word_text.dart';
@@ -19,10 +20,10 @@ class ChatBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
           color: isUser
-              ? Theme.of(context).colorScheme.tertiary.withOpacity(
-                  0.9,
-                ) // Slightly transparent blue for user
-              : const Color(0xFF372963).withOpacity(0.9), // Lighter purple for bot messages
+              ? Theme.of(context)
+                    .colorScheme
+                    .tertiary // Slightly transparent blue for user
+              : const Color(0xFF372963), // Lighter purple for bot messages
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Column(
@@ -34,7 +35,7 @@ class ChatBubble extends StatelessWidget {
                     message,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 12,
                       height: 1.4,
                       fontStyle: FontStyle.italic,
                     ),
@@ -45,7 +46,7 @@ class ChatBubble extends StatelessWidget {
                         text: message,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.9),
-                          fontSize: 14,
+                          fontSize: 12,
                           height: 1.4,
                           fontStyle: FontStyle.italic,
                         ),
@@ -53,10 +54,15 @@ class ChatBubble extends StatelessWidget {
                       );
                     },
                   ),
-            // Add play button for bot messages only
+            // Add play button for bot messages only (if audio is enabled)
             if (!isUser)
-              Consumer<TtsService>(
-                builder: (context, ttsService, _) {
+              Consumer2<TtsService, SettingsModel>(
+                builder: (context, ttsService, settings, _) {
+                  // Don't show button if audio is disabled
+                  if (!settings.audioEnabled) {
+                    return const SizedBox.shrink();
+                  }
+
                   // Check if THIS specific message is currently playing
                   final isThisMessagePlaying =
                       ttsService.isSpeaking &&
@@ -66,25 +72,25 @@ class ChatBubble extends StatelessWidget {
                       );
 
                   return Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.bottomRight,
                     child: IconButton(
                       icon: Icon(
                         isThisMessagePlaying
                             ? Icons
                                   .stop // Show stop icon when THIS message is speaking
                             : Icons.volume_up, // Show play icon when not speaking
-                        size: 16,
+                        size: 20,
                         color: isThisMessagePlaying
                             ? Theme.of(context)
                                   .colorScheme
-                                  .primary // Brighter when speaking
+                                  .tertiary // Brighter when speaking
                             : Theme.of(
                                 context,
-                              ).colorScheme.primary.withOpacity(0.8), // Normal color
+                              ).colorScheme.tertiary.withOpacity(0.3), // Normal color
                       ),
-                      constraints: const BoxConstraints(maxHeight: 24, maxWidth: 24),
+                      constraints: const BoxConstraints(maxHeight: 20, maxWidth: 20),
                       padding: EdgeInsets.zero,
-                      iconSize: 16,
+                      iconSize: 20,
                       visualDensity: VisualDensity.compact,
                       onPressed: isThisMessagePlaying
                           ? () {

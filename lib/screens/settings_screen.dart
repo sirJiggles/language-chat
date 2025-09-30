@@ -27,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedLanguage = 'German';
   String _selectedOpenAIVoice = 'nova';
   String _selectedNativeLanguage = 'English';
+  bool _audioEnabled = true;
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final chat = context.read<ChatService>();
     final settings = context.read<SettingsModel>();
     _selectedLanguage = chat.targetLanguage;
+    _audioEnabled = settings.audioEnabled;
     _selectedOpenAIVoice = settings.openaiTtsVoice;
     _selectedNativeLanguage = settings.nativeLanguage;
   }
@@ -96,6 +98,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             dropdownColor: Theme.of(context).cardColor,
             icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+          ),
+          const SizedBox(height: 24),
+          
+          // Audio Toggle
+          SwitchListTile(
+            title: const Text('Enable Audio'),
+            subtitle: const Text('Play bot responses with voice'),
+            value: _audioEnabled,
+            onChanged: (value) {
+              setState(() => _audioEnabled = value);
+            },
+            activeColor: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 24),
           
@@ -296,6 +310,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     // Apply native language
     settings.setNativeLanguage(_selectedNativeLanguage);
+    
+    // Apply audio enabled setting
+    settings.setAudioEnabled(_audioEnabled);
     
     // Apply OpenAI voice (always using OpenAI TTS now)
     tts.setTtsProvider(TtsProvider.openai);

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/settings_model.dart';
 import '../services/chat_service.dart';
 import '../services/context_manager.dart';
 import '../services/speech_service.dart';
@@ -76,13 +77,25 @@ class ChatScreenState extends State<ChatScreen> {
       // Start the conversation with an empty message to trigger the AI's initial greeting
       // Hide this message from the conversation display
       final chatService = Provider.of<ChatService>(context, listen: false);
+      final settings = Provider.of<SettingsModel>(context, listen: false);
+
       debugPrint('Sending initial greeting message');
       final response = await chatService.sendMessage('Hallo', hideUserMessage: true);
 
-      // Explicitly trigger TTS for the first message
-      debugPrint('Explicitly speaking first message: "$response"');
-      await Future.delayed(const Duration(milliseconds: 500)); // Give UI time to update
-      await ttsService.speak(response);
+      // Handle audio based on settings
+      if (settings.audioEnabled) {
+        // Explicitly trigger TTS for the first message
+        debugPrint('Explicitly speaking first message: "$response"');
+        await Future.delayed(const Duration(milliseconds: 500)); // Give UI time to update
+        // Start audio (don't await - let it play in background)
+        ttsService.speak(response);
+        // Reveal message after audio starts (not finishes)
+        await Future.delayed(const Duration(milliseconds: 200));
+        chatService.revealBotMessage();
+      } else {
+        // No audio, reveal immediately
+        chatService.revealBotMessage();
+      }
     }
   }
 
@@ -116,15 +129,29 @@ class ChatScreenState extends State<ChatScreen> {
     // Send the message
     final chatService = Provider.of<ChatService>(context, listen: false);
     final ttsService = Provider.of<TtsService>(context, listen: false);
+    final settings = Provider.of<SettingsModel>(context, listen: false);
 
     final response = await chatService.sendMessage(text);
 
-    // Speak the response
-    try {
-      final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
-      await ttsService.speak(cleanResponse);
-    } catch (e) {
-      debugPrint('Error speaking response: $e');
+    // If audio is enabled, keep thinking indicator until audio starts
+    // Otherwise, reveal message immediately
+    if (settings.audioEnabled) {
+      // Speak the response (don't await - let it play in background)
+      try {
+        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
+        // Start audio (don't await)
+        ttsService.speak(cleanResponse);
+        // Give a tiny delay for audio to start, then reveal message
+        await Future.delayed(const Duration(milliseconds: 200));
+        chatService.revealBotMessage();
+      } catch (e) {
+        debugPrint('Error speaking response: $e');
+        // On error, reveal message anyway
+        chatService.revealBotMessage();
+      }
+    } else {
+      // Audio disabled, reveal immediately
+      chatService.revealBotMessage();
     }
 
     // Auto-scroll to bottom
@@ -237,7 +264,7 @@ class ChatScreenState extends State<ChatScreen> {
                       top: kToolbarHeight + 40,
                       left: 10.0,
                       right: 10.0,
-                      bottom: 80.0, // Extra padding for frosted glass bottom bar
+                      bottom: 95.0, // Extra padding for frosted glass bottom bar
                     ),
                     itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                     itemBuilder: (context, index) {
@@ -350,5 +377,4 @@ class ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
 }
