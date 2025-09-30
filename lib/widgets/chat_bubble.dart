@@ -8,11 +8,7 @@ class ChatBubble extends StatelessWidget {
   final String message;
   final bool isUser;
 
-  const ChatBubble({
-    super.key,
-    required this.message,
-    required this.isUser,
-  });
+  const ChatBubble({super.key, required this.message, required this.isUser});
 
   @override
   Widget build(BuildContext context) {
@@ -20,17 +16,13 @@ class ChatBubble extends StatelessWidget {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16.0,
-          vertical: 10.0,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
           color: isUser
-              ? Theme.of(context)
-                    .colorScheme
-                    .tertiary
-                    .withOpacity(0.9) // Slightly transparent blue for user
-              : const Color(0xFF1E1E1E).withOpacity(0.85), // Slightly transparent dark for bot
+              ? Theme.of(context).colorScheme.tertiary.withOpacity(
+                  0.9,
+                ) // Slightly transparent blue for user
+              : const Color(0xFF372963).withOpacity(0.9), // Lighter purple for bot messages
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Column(
@@ -40,7 +32,7 @@ class ChatBubble extends StatelessWidget {
             isUser
                 ? Text(
                     message,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
                   )
                 : Consumer<WordDefinitionService>(
                     builder: (context, definitionService, _) {
@@ -48,6 +40,8 @@ class ChatBubble extends StatelessWidget {
                         text: message,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                          height: 1.4,
                         ),
                         definitionService: definitionService,
                       );
@@ -58,30 +52,35 @@ class ChatBubble extends StatelessWidget {
               Consumer<TtsService>(
                 builder: (context, ttsService, _) {
                   // Check if THIS specific message is currently playing
-                  final isThisMessagePlaying = ttsService.isSpeaking && 
+                  final isThisMessagePlaying =
+                      ttsService.isSpeaking &&
                       ttsService.lastSpokenText != null &&
-                      ttsService.lastSpokenText!.contains(message.substring(0, message.length > 50 ? 50 : message.length));
-                  
+                      ttsService.lastSpokenText!.contains(
+                        message.substring(0, message.length > 50 ? 50 : message.length),
+                      );
+
                   return Align(
                     alignment: Alignment.centerRight,
                     child: IconButton(
                       icon: Icon(
-                        isThisMessagePlaying 
-                            ? Icons.stop // Show stop icon when THIS message is speaking
+                        isThisMessagePlaying
+                            ? Icons
+                                  .stop // Show stop icon when THIS message is speaking
                             : Icons.volume_up, // Show play icon when not speaking
                         size: 16,
-                        color: isThisMessagePlaying 
-                            ? Theme.of(context).colorScheme.tertiary // Brighter when speaking
-                            : Theme.of(context).colorScheme.tertiary.withOpacity(0.8), // Normal color
+                        color: isThisMessagePlaying
+                            ? Theme.of(context)
+                                  .colorScheme
+                                  .primary // Brighter when speaking
+                            : Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.8), // Normal color
                       ),
-                      constraints: const BoxConstraints(
-                        maxHeight: 24,
-                        maxWidth: 24,
-                      ),
+                      constraints: const BoxConstraints(maxHeight: 24, maxWidth: 24),
                       padding: EdgeInsets.zero,
                       iconSize: 16,
                       visualDensity: VisualDensity.compact,
-                      onPressed: isThisMessagePlaying 
+                      onPressed: isThisMessagePlaying
                           ? () {
                               // Stop speaking if THIS message is playing
                               debugPrint('ChatBubble: Stopping TTS');
@@ -91,14 +90,14 @@ class ChatBubble extends StatelessWidget {
                               // Get the message text
                               final messageText = message;
                               debugPrint('ChatBubble: Playing audio for message');
-                              
+
                               // Make sure any ongoing TTS is stopped
                               if (ttsService.isSpeaking) {
                                 await ttsService.stop();
                                 // Small delay to ensure stop completes
                                 await Future.delayed(const Duration(milliseconds: 100));
                               }
-                              
+
                               // Play the audio
                               await ttsService.speak(messageText);
                               debugPrint('ChatBubble: TTS speak method returned');
@@ -123,22 +122,14 @@ class ThinkingBubble extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16.0,
-          vertical: 10.0,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E).withOpacity(0.85),
+          color: const Color(0xFF372963).withOpacity(0.9),
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: SizedBox(
           height: 20, // Reduced height for the container
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ThinkingDots(),
-            ],
-          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [_ThinkingDots()]),
         ),
       ),
     );

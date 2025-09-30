@@ -30,20 +30,20 @@ class ArchiveScreen extends StatelessWidget {
           final archives = archiveStore.archives;
 
           if (archives.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.archive_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
+                  Icon(Icons.archive_outlined, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  const SizedBox(height: 16),
                   Text(
                     'No archived conversations yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                    style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     'Start a new conversation to archive your current one',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -172,11 +172,11 @@ class _ArchiveCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               dateStr,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             ),
             Text(
               '$messageCount messages',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             ),
           ],
         ),
@@ -288,12 +288,12 @@ class _ArchivedMessageBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: message.isUser
               ? Theme.of(context).colorScheme.tertiary.withOpacity(0.9)
-              : const Color(0xFF1E1E1E).withOpacity(0.85),
+              : const Color(0xFF372963).withOpacity(0.9),
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Text(
           message.content,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
       ),
     );

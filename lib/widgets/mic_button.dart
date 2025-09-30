@@ -58,6 +58,8 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
   }
   
   void _onTtsStateChanged() {
+    if (!mounted) return; // Check if widget is still mounted
+    
     final ttsService = Provider.of<TtsService>(context, listen: false);
     final newIsSpeaking = ttsService.isSpeaking;
     
@@ -86,7 +88,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                       ? Colors.grey.shade400
                       : Theme.of(context).colorScheme.primary)
                 : (_isSpeaking ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary);
-            final iconColor = Colors.white;
+            final iconColor = const Color(0xFF261D45); // Purple icon color matching theme
 
             return GestureDetector(
               onTapDown: (_) async {
@@ -189,15 +191,15 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                       children: [
                         // Show sound wave animation when bot is talking, otherwise show mic icon
                         _isSpeaking 
-                          ? SoundWaveAnimation(
-                              color: Colors.white,
-                              size: size * 0.6,
-                              barCount: size > 60 ? 9 : 5,
-                              barWidth: size > 60 ? 2.0 : 1.5,
-                              barSpacing: size > 60 ? 2.0 : 1.5,
+                          ? const SoundWaveAnimation(
+                              color: Color(0xFF261D45), // Purple wave matching theme
+                              size: 48,
+                              barCount: 9,
+                              barWidth: 2.0,
+                              barSpacing: 2.0,
                               minBarHeight: 2.0,
-                              maxBarHeight: size > 60 ? 18.0 : 12.0,
-                              animationDuration: const Duration(milliseconds: 200),
+                              maxBarHeight: 18.0,
+                              animationDuration: Duration(milliseconds: 200),
                             )
                           : Icon(
                               Icons.mic,
@@ -207,7 +209,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                         if (_cancelRecording && isListening && size > 60)
                           Positioned(
                             bottom: size * 0.125,
-                            child: Icon(Icons.cancel, size: size * 0.225, color: Colors.white),
+                            child: Icon(Icons.cancel, size: size * 0.225, color: const Color(0xFF261D45)),
                           ),
                       ],
                     ),

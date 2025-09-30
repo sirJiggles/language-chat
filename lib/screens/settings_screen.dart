@@ -66,12 +66,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
-              focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
               ),
             ),
-            dropdownColor: const Color(0xFF1E1E1E),
-            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+            dropdownColor: Theme.of(context).cardColor,
+            icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
           ),
           const SizedBox(height: 24),
           
@@ -90,12 +90,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
-              focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
               ),
             ),
-            dropdownColor: const Color(0xFF1E1E1E),
-            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+            dropdownColor: Theme.of(context).cardColor,
+            icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
           ),
           const SizedBox(height: 24),
           
@@ -117,12 +117,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
-                focusedBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF2B80D4), width: 2.0),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
                 ),
               ),
-              dropdownColor: const Color(0xFF1E1E1E),
-              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B80D4)),
+              dropdownColor: Theme.of(context).cardColor,
+              icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(height: 12),
             Consumer<TtsService>(

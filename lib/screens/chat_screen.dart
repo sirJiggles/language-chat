@@ -200,7 +200,8 @@ class ChatScreenState extends State<ChatScreen> {
       drawer: _buildDrawer(context),
       body: TiledBackground(
         assetPath: 'assets/tile.png',
-        overlayOpacity: 0.2,
+        overlayOpacity: 0.5,
+        overlayColor: const Color(0xFF261D45), // Purple overlay matching the theme
         child: Stack(
           children: [
             // Main chat content (full screen)
@@ -208,75 +209,81 @@ class ChatScreenState extends State<ChatScreen> {
               builder: (context, chatService, _) {
                 final messages = chatService.conversationStore.messages;
 
-                  if (messages.isNotEmpty) {
-                    final thinkingMessages = messages.where((msg) => msg.isThinking).toList();
-                    final isThinking = thinkingMessages.isNotEmpty || chatService.isThinking;
+                if (messages.isNotEmpty) {
+                  final thinkingMessages = messages.where((msg) => msg.isThinking).toList();
+                  final isThinking = thinkingMessages.isNotEmpty || chatService.isThinking;
 
-                    final visibleMessages = messages
-                        .where(
-                          (msg) =>
-                              !msg.isThinking &&
-                              !msg.content.contains('<thinking id=') &&
-                              msg.content.isNotEmpty,
-                        )
-                        .toList();
+                  final visibleMessages = messages
+                      .where(
+                        (msg) =>
+                            !msg.isThinking &&
+                            !msg.content.contains('<thinking id=') &&
+                            msg.content.isNotEmpty,
+                      )
+                      .toList();
 
-                    // Schedule a scroll to bottom after the UI updates
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _scrollToBottom();
-                    });
+                  // Schedule a scroll to bottom after the UI updates
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToBottom();
+                  });
 
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        top: kToolbarHeight + 16,
-                        left: 10.0,
-                        right: 10.0,
-                        bottom: 80.0, // Extra padding for frosted glass bottom bar
-                      ),
-                      itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
-                      itemBuilder: (context, index) {
-                        if (isThinking && index == visibleMessages.length) {
-                          return const ThinkingBubble();
-                        }
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(
+                      top: kToolbarHeight + 40,
+                      left: 10.0,
+                      right: 10.0,
+                      bottom: 80.0, // Extra padding for frosted glass bottom bar
+                    ),
+                    itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
+                    itemBuilder: (context, index) {
+                      if (isThinking && index == visibleMessages.length) {
+                        return const ThinkingBubble();
+                      }
 
-                        final message = visibleMessages[index];
-                        return ChatBubble(message: message.content, isUser: message.isUser);
-                      },
-                    );
-                  } else {
-                    return Consumer<ContextManager>(
-                      builder: (context, contextManager, _) {
-                        if (!_botGreetingSent) {
-                          return const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ThinkingDots(),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Starting conversation...',
-                                  style: TextStyle(fontSize: 16.0, color: Colors.grey),
-                                  textAlign: TextAlign.center,
+                      final message = visibleMessages[index];
+                      return ChatBubble(message: message.content, isUser: message.isUser);
+                    },
+                  );
+                } else {
+                  return Consumer<ContextManager>(
+                    builder: (context, contextManager, _) {
+                      if (!_botGreetingSent) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const ThinkingDots(),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Starting conversation...',
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                 ),
-                              ],
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return Center(
+                          child: Text(
+                            'Welcome!',
+                            style: TextStyle(
+                              fontSize: 16.0,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             ),
-                          );
-                        } else {
-                          return const Center(
-                            child: Text(
-                              'Welcome!',
-                              style: TextStyle(fontSize: 16.0, color: Colors.grey),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  }
-                },
-              ),
-            
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }
+              },
+            ),
+
             // Bottom elements positioned at the bottom
             Positioned(
               left: 0,
@@ -295,12 +302,12 @@ class ChatScreenState extends State<ChatScreen> {
                         child: Consumer<SpeechService>(
                           builder: (context, speechService, _) {
                             final isListening = speechService.isListening;
-                            
+
                             // Update text field with speech as user speaks
                             if (isListening) {
                               _textController.text = speechService.lastWords;
                             }
-                            
+
                             return Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -308,7 +315,9 @@ class ChatScreenState extends State<ChatScreen> {
                                 Expanded(
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface.withOpacity(0.95),
                                       borderRadius: BorderRadius.circular(24),
                                       boxShadow: [
                                         BoxShadow(
@@ -320,12 +329,21 @@ class ChatScreenState extends State<ChatScreen> {
                                     ),
                                     child: TextField(
                                       controller: _textController,
-                                      style: const TextStyle(color: Colors.black87),
-                                      decoration: const InputDecoration(
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                      ),
+                                      decoration: InputDecoration(
                                         hintText: 'Message',
-                                        hintStyle: TextStyle(color: Colors.black38),
+                                        hintStyle: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface.withOpacity(0.5),
+                                        ),
                                         border: InputBorder.none,
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                          vertical: 12,
+                                        ),
                                       ),
                                       maxLines: null,
                                       textInputAction: TextInputAction.send,
@@ -339,7 +357,7 @@ class ChatScreenState extends State<ChatScreen> {
                                   valueListenable: _textController,
                                   builder: (context, value, child) {
                                     final hasText = value.text.trim().isNotEmpty;
-                                    
+
                                     // Show send button when there's text AND not listening
                                     // Show mic when empty OR currently listening
                                     return SizedBox(
@@ -362,9 +380,9 @@ class ChatScreenState extends State<ChatScreen> {
                                                     ),
                                                   ],
                                                 ),
-                                                child: const Icon(
+                                                child: Icon(
                                                   Icons.send,
-                                                  color: Colors.white,
+                                                  color: Theme.of(context).colorScheme.onPrimary,
                                                   size: 24,
                                                 ),
                                               ),
@@ -418,7 +436,7 @@ class ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
-          
+
           // New Chat button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -429,21 +447,19 @@ class ChatScreenState extends State<ChatScreen> {
               },
               icon: const Icon(Icons.add),
               label: const Text('New Chat'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-              ),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
             ),
           ),
-          
+
           const SizedBox(height: 8),
           const Divider(),
-          
+
           // Archived chats list
           Expanded(
             child: Consumer<ConversationArchiveStore>(
               builder: (context, archiveStore, _) {
                 final archives = archiveStore.archives;
-                
+
                 if (archives.isEmpty) {
                   return const Center(
                     child: Padding(
@@ -456,7 +472,7 @@ class ChatScreenState extends State<ChatScreen> {
                     ),
                   );
                 }
-                
+
                 return ListView.builder(
                   itemCount: archives.length,
                   itemBuilder: (context, index) {
@@ -481,12 +497,12 @@ class ChatScreenState extends State<ChatScreen> {
 
   void _confirmNewChat(BuildContext context) {
     final chatService = Provider.of<ChatService>(context, listen: false);
-    
+
     // Check if there are messages to archive
     if (chatService.conversationStore.messages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No conversation to archive')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No conversation to archive')));
       return;
     }
 
@@ -498,10 +514,7 @@ class ChatScreenState extends State<ChatScreen> {
           'This will archive your current conversation and start a new one. Continue?',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -525,9 +538,7 @@ class ChatScreenState extends State<ChatScreen> {
   void _viewArchive(BuildContext context, ArchivedConversation archive) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => _ArchiveDetailScreen(archive: archive),
-      ),
+      MaterialPageRoute(builder: (_) => _ArchiveDetailScreen(archive: archive)),
     );
   }
 
@@ -542,17 +553,14 @@ class ChatScreenState extends State<ChatScreen> {
         title: const Text('Delete Conversation'),
         content: Text('Delete "${archive.title}"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               store.deleteConversation(archive.id);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Conversation deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Conversation deleted')));
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
@@ -568,16 +576,12 @@ class _ArchiveListTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  const _ArchiveListTile({
-    required this.archive,
-    required this.onTap,
-    required this.onDelete,
-  });
+  const _ArchiveListTile({required this.archive, required this.onTap, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     final dateStr = _formatDate(archive.timestamp);
-    
+
     return ListTile(
       leading: const Icon(Icons.chat_bubble_outline, size: 20),
       title: Text(
@@ -604,7 +608,7 @@ class _ArchiveListTile extends StatelessWidget {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inDays == 0) {
       return 'Today';
     } else if (diff.inDays == 1) {
@@ -626,9 +630,7 @@ class _ArchiveDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(archive.title),
-      ),
+      appBar: AppBar(title: Text(archive.title)),
       body: Column(
         children: [
           // Header with date
@@ -664,10 +666,7 @@ class _ArchiveDetailScreen extends StatelessWidget {
               itemCount: archive.messages.length,
               itemBuilder: (context, index) {
                 final message = archive.messages[index];
-                return ChatBubble(
-                  message: message.content,
-                  isUser: message.isUser,
-                );
+                return ChatBubble(message: message.content, isUser: message.isUser);
               },
             ),
           ),
@@ -677,7 +676,20 @@ class _ArchiveDetailScreen extends StatelessWidget {
   }
 
   String _formatDetailDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
     return '${months[date.month - 1]} ${date.day}, ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $amPm';

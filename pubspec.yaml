@@ -99,3 +99,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  
+  fonts:
+    - family: DankMono
+      fonts:
+        - asset: assets/fonts/DankMono-Regular.ttf
+        - asset: assets/fonts/DankMono-Italic.ttf
+          style: italic
