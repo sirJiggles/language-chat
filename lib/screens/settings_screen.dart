@@ -169,6 +169,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: _apply,
             icon: const Icon(Icons.save),
             label: const Text('Apply'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
           ),
           
           const SizedBox(height: 32),

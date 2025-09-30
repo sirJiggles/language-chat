@@ -110,72 +110,11 @@ class MyApp extends StatelessWidget {
     // Define our custom colors based on cyberpunk theme
     const primaryColor = Color(0xFF00FF9C); // Bright cyan-green as primary
     const secondaryColor = Color(0xFF00ffc8); // Cyan as secondary
-    const tertiaryColor = Color(0xFF00b0ff); // Blue as tertiary
+    const tertiaryColor = Color(0xFF3d81fe); // Blue as tertiary
 
-    // Create italic text theme
+    // Create regular DankMono text theme (not italic)
     final baseTextTheme = ThemeData.dark().textTheme;
-    final italicTextTheme = TextTheme(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      displaySmall: baseTextTheme.displaySmall?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      labelMedium: baseTextTheme.labelMedium?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(
-        fontFamily: 'DankMono',
-        fontStyle: FontStyle.italic,
-      ),
-    );
+    final dankMonoTextTheme = baseTextTheme.apply(fontFamily: 'DankMono');
 
     return MaterialApp(
       title: 'Language Chat',
@@ -193,7 +132,7 @@ class MyApp extends StatelessWidget {
           surfaceVariant: const Color(0xFF372963), // Lighter purple for cards
         ),
         useMaterial3: true,
-        textTheme: italicTextTheme,
+        textTheme: dankMonoTextTheme,
         cardColor: const Color(0xFF372963), // Lighter purple for cards
         dialogBackgroundColor: const Color(0xFF372963),
       ),
@@ -210,7 +149,7 @@ class MyApp extends StatelessWidget {
           surfaceVariant: const Color(0xFF372963), // Lighter purple for cards
         ),
         useMaterial3: true,
-        textTheme: italicTextTheme,
+        textTheme: dankMonoTextTheme,
         cardColor: const Color(0xFF372963), // Lighter purple for cards
         dialogBackgroundColor: const Color(0xFF372963),
       ),

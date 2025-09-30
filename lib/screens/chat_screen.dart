@@ -2,12 +2,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
+import '../services/context_manager.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
-import '../services/context_manager.dart';
-import '../models/conversation_archive.dart';
-import '../widgets/widgets.dart';
-import '../screens/settings_screen.dart';
+import '../widgets/chat_bubble.dart';
+import '../widgets/chat_drawer.dart';
+import '../widgets/chat_input_bar.dart';
+import '../widgets/thinking_dots.dart';
+import '../widgets/tiled_background.dart';
+import 'settings_screen.dart';
 import '../debug/debug_menu.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -86,9 +89,13 @@ class ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeServices() async {
     final speechService = context.read<SpeechService>();
     final ttsService = context.read<TtsService>();
+    final chatService = context.read<ChatService>();
 
     await speechService.initialize();
     await ttsService.initialize();
+
+    // Set the speech recognition locale to target language
+    speechService.setLocaleFromLanguage(chatService.targetLanguage);
   }
 
   // Handle chat service updates
@@ -136,9 +143,6 @@ class ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the bottom safe area height
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
@@ -197,7 +201,7 @@ class ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ),
-      drawer: _buildDrawer(context),
+      drawer: ChatDrawer(onNewChat: () => _confirmNewChat(context)),
       body: TiledBackground(
         assetPath: 'assets/tile.png',
         overlayOpacity: 0.5,
@@ -293,204 +297,16 @@ class ChatScreenState extends State<ChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // WhatsApp-style bottom input area with frosted glass
-                  ClipRRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-                        padding: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, bottomPadding + 8.0),
-                        child: Consumer<SpeechService>(
-                          builder: (context, speechService, _) {
-                            final isListening = speechService.isListening;
-
-                            // Update text field with speech as user speaks
-                            if (isListening) {
-                              _textController.text = speechService.lastWords;
-                            }
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                // Text input field
-                                Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.surface.withOpacity(0.95),
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: TextField(
-                                      controller: _textController,
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurface,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: 'Message',
-                                        hintStyle: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface.withOpacity(0.5),
-                                        ),
-                                        border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 20,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      maxLines: null,
-                                      textInputAction: TextInputAction.send,
-                                      onSubmitted: (_) => _sendTextMessage(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // Mic/Send button
-                                ValueListenableBuilder<TextEditingValue>(
-                                  valueListenable: _textController,
-                                  builder: (context, value, child) {
-                                    final hasText = value.text.trim().isNotEmpty;
-
-                                    // Show send button when there's text AND not listening
-                                    // Show mic when empty OR currently listening
-                                    return SizedBox(
-                                      width: 48,
-                                      height: 48,
-                                      child: (hasText && !isListening)
-                                          ? IconButton(
-                                              onPressed: _sendTextMessage,
-                                              icon: Container(
-                                                width: 48,
-                                                height: 48,
-                                                decoration: BoxDecoration(
-                                                  color: Theme.of(context).colorScheme.primary,
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.black.withOpacity(0.2),
-                                                      blurRadius: 8,
-                                                      offset: const Offset(0, 4),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: Icon(
-                                                  Icons.send,
-                                                  color: Theme.of(context).colorScheme.onPrimary,
-                                                  size: 24,
-                                                ),
-                                              ),
-                                              padding: EdgeInsets.zero,
-                                            )
-                                          : MicButton(onScrollToBottom: _scrollToBottom),
-                                    );
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  ChatInputBar(
+                    textController: _textController,
+                    onSendMessage: _sendTextMessage,
+                    onScrollToBottom: _scrollToBottom,
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      child: Column(
-        children: [
-          // Simple header with padding
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.chat_bubble_outline,
-                    size: 28,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Conversations',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // New Chat button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context); // Close drawer
-                _confirmNewChat(context);
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('New Chat'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-          const Divider(),
-
-          // Archived chats list
-          Expanded(
-            child: Consumer<ConversationArchiveStore>(
-              builder: (context, archiveStore, _) {
-                final archives = archiveStore.archives;
-
-                if (archives.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'No archived conversations yet',
-                        style: TextStyle(color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: archives.length,
-                  itemBuilder: (context, index) {
-                    final archive = archives[index];
-                    return _ArchiveListTile(
-                      archive: archive,
-                      onTap: () {
-                        Navigator.pop(context); // Close drawer
-                        _viewArchive(context, archive);
-                      },
-                      onDelete: () => _confirmDelete(context, archiveStore, archive),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -535,163 +351,4 @@ class ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _viewArchive(BuildContext context, ArchivedConversation archive) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => _ArchiveDetailScreen(archive: archive)),
-    );
-  }
-
-  void _confirmDelete(
-    BuildContext context,
-    ConversationArchiveStore store,
-    ArchivedConversation archive,
-  ) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Conversation'),
-        content: Text('Delete "${archive.title}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              store.deleteConversation(archive.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Conversation deleted')));
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Archive list tile widget
-class _ArchiveListTile extends StatelessWidget {
-  final ArchivedConversation archive;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-
-  const _ArchiveListTile({required this.archive, required this.onTap, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = _formatDate(archive.timestamp);
-
-    return ListTile(
-      leading: const Icon(Icons.chat_bubble_outline, size: 20),
-      title: Text(
-        archive.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 14),
-      ),
-      subtitle: Text(
-        '$dateStr • ${archive.messages.length} messages',
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-      ),
-      trailing: IconButton(
-        icon: const Icon(Icons.delete_outline, size: 20),
-        onPressed: onDelete,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(),
-      ),
-      onTap: onTap,
-      dense: true,
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-
-    if (diff.inDays == 0) {
-      return 'Today';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    } else {
-      return '${date.month}/${date.day}';
-    }
-  }
-}
-
-// Archive detail screen
-class _ArchiveDetailScreen extends StatelessWidget {
-  final ArchivedConversation archive;
-
-  const _ArchiveDetailScreen({required this.archive});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(archive.title)),
-      body: Column(
-        children: [
-          // Header with date
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            color: Theme.of(context).colorScheme.surfaceVariant,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _formatDetailDate(archive.timestamp),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${archive.messages.length} messages',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Messages
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: archive.messages.length,
-              itemBuilder: (context, index) {
-                final message = archive.messages[index];
-                return ChatBubble(message: message.content, isUser: message.isUser);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDetailDate(DateTime date) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
-    final amPm = date.hour >= 12 ? 'PM' : 'AM';
-    return '${months[date.month - 1]} ${date.day}, ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
-  }
 }

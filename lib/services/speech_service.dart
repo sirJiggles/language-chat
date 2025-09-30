@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SpeechService extends ChangeNotifier {
@@ -7,12 +8,12 @@ class SpeechService extends ChangeNotifier {
   String _lastWords = '';
   String _error = '';
   String _localeId = 'en_US';
-  
+
   bool get isListening => _isListening;
   String get lastWords => _lastWords;
   String get error => _error;
   String get localeId => _localeId;
-  
+
   Future<bool> initialize() async {
     bool available = await _speech.initialize(
       onStatus: (status) {
@@ -24,12 +25,20 @@ class SpeechService extends ChangeNotifier {
         notifyListeners();
       },
     );
+
     return available;
   }
-  
+
   Future<void> startListening() async {
     _lastWords = '';
     _error = '';
+
+    // Double-check the current locale before starting
+    if (_speech.isAvailable) {
+      var currentLocale = await _speech.systemLocale();
+      debugPrint('SpeechService: Current system locale before listen: ${currentLocale?.localeId}');
+    }
+
     await _speech.listen(
       onResult: (result) {
         _lastWords = result.recognizedWords;
@@ -43,13 +52,13 @@ class SpeechService extends ChangeNotifier {
     );
     notifyListeners();
   }
-  
+
   Future<void> stopListening() async {
     await _speech.stop();
     _isListening = false;
     notifyListeners();
   }
-  
+
   void clearLastWords() {
     _lastWords = '';
     notifyListeners();
@@ -58,6 +67,7 @@ class SpeechService extends ChangeNotifier {
   // Update the recognizer locale from a human language name (e.g., 'German')
   void setLocaleFromLanguage(String languageName) {
     final l = languageName.toLowerCase();
+    debugPrint('SpeechService: Setting locale for language: $languageName');
     if (l.startsWith('german') || l.startsWith('de')) {
       _localeId = 'de_DE';
     } else if (l.startsWith('spanish') || l.startsWith('es')) {
@@ -91,9 +101,10 @@ class SpeechService extends ChangeNotifier {
     } else {
       _localeId = 'en_US';
     }
+    debugPrint('SpeechService: Locale set to: $_localeId');
     notifyListeners();
   }
-  
+
   @override
   void dispose() {
     _speech.cancel();

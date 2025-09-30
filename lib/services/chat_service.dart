@@ -36,6 +36,7 @@ class ChatService extends ChangeNotifier {
   String _lastResponse = '';
   bool _isThinking = false;
   String _thinkingMessageId = '';
+  String? _currentArchiveId; // Track the current "live" archive
 
   // Legacy support for string-based conversation
   String get conversation => _conversationStore.legacyConversation;
@@ -120,35 +121,68 @@ class ChatService extends ChangeNotifier {
         _targetLanguage,
         hideUserMessage: hideUserMessage,
       );
-
       // Add assessment messages to the assessment store
       if (_assessmentService.lastAssessmentMessage != null) {
         _assessmentStore.addMessage(_assessmentService.lastAssessmentMessage!);
       }
 
-      // Return the message to the user
-      return assistantMessage;
+      // Notify listeners to update UI
+      notifyListeners();
+
+      // Auto-save to archive after each message
+      await _autoSaveToArchive();
+
+      return _lastResponse;
     } catch (e) {
-      debugPrint('Error sending message: $e');
+      debugPrint('Error in sendMessage: $e');
+      _isThinking = false;
+      _conversationStore.removeThinking();
+      notifyListeners();
+      rethrow;
+    }
+  }
 
-      // Add error message to conversation
-      _conversationStore.addMessage(
-        Message(
-          content: 'Sorry, I encountered an error. Please try again.',
-          source: MessageSource.system,
-        ),
+  /// Automatically save/update the current conversation as a live archive
+  Future<void> _autoSaveToArchive() async {
+    if (_archiveStore == null) return;
+    
+    // Only save if there are actual messages (not just thinking indicators)
+    final realMessages = _conversationStore.messages
+        .where((m) => !m.isThinking && m.content.isNotEmpty)
+        .toList();
+    
+    if (realMessages.isEmpty) return;
+
+    // Convert to archived messages
+    final archivedMessages = realMessages
+        .map((m) => ArchivedMessage(
+              content: m.content,
+              isUser: m.isUser,
+              timestamp: DateTime.now(),
+            ))
+        .toList();
+
+    final title = ConversationArchiveStore.generateTitle(archivedMessages);
+
+    if (_currentArchiveId == null) {
+      // Create new archive for this conversation
+      _currentArchiveId = DateTime.now().millisecondsSinceEpoch.toString();
+      final archived = ArchivedConversation(
+        id: _currentArchiveId!,
+        timestamp: DateTime.now(),
+        messages: archivedMessages,
+        title: title,
       );
-
-      return 'Sorry, I encountered an error. Please try again.';
-    } finally {
-      // Make sure the thinking message is removed in case of error
-      if (_isThinking) {
-        debugPrint('Cleaning up thinking state in finally block');
-        _conversationStore.removeThinking();
-        _isThinking = false;
-        _thinkingMessageId = '';
-        notifyListeners();
-      }
+      _archiveStore.archiveConversation(archived);
+      debugPrint('Created live archive: $title');
+    } else {
+      // Update existing archive
+      _archiveStore.updateConversation(
+        _currentArchiveId!,
+        archivedMessages,
+        title,
+      );
+      debugPrint('Updated live archive: $title');
     }
   }
 
@@ -198,42 +232,17 @@ class ChatService extends ChangeNotifier {
   }
 
   /// Archive current conversation and start a new one
+  /// Note: With auto-save enabled, the current conversation is already archived.
+  /// This method just resets the archive ID to start a fresh conversation.
   Future<void> archiveAndStartNew() async {
-    // Only archive if there are messages
-    if (_conversationStore.messages.isEmpty) {
-      return;
-    }
-
-    // Create archived conversation
-    final archivedMessages = _conversationStore.messages
-        .where((m) => !m.isThinking && m.content.isNotEmpty)
-        .map((m) => ArchivedMessage(
-              content: m.content,
-              isUser: m.isUser,
-              timestamp: DateTime.now(),
-            ))
-        .toList();
-
-    if (archivedMessages.isEmpty) {
-      return;
-    }
-
-    final title = ConversationArchiveStore.generateTitle(archivedMessages);
-    final archived = ArchivedConversation(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      timestamp: DateTime.now(),
-      messages: archivedMessages,
-      title: title,
-    );
-
-    // Add to archive store
-    _archiveStore?.archiveConversation(archived);
+    // Reset the current archive ID to start a new conversation
+    _currentArchiveId = null;
 
     // Clear current conversation
     clearConversation();
     clearAssessment();
 
-    debugPrint('Conversation archived: $title');
+    debugPrint('Starting new conversation (previous auto-saved)');
   }
 
   void setTargetLanguage(String lang) {

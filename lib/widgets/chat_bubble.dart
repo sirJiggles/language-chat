@@ -32,7 +32,12 @@ class ChatBubble extends StatelessWidget {
             isUser
                 ? Text(
                     message,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                      fontStyle: FontStyle.italic,
+                    ),
                   )
                 : Consumer<WordDefinitionService>(
                     builder: (context, definitionService, _) {
@@ -42,6 +47,7 @@ class ChatBubble extends StatelessWidget {
                           color: Colors.white.withOpacity(0.9),
                           fontSize: 14,
                           height: 1.4,
+                          fontStyle: FontStyle.italic,
                         ),
                         definitionService: definitionService,
                       );

@@ -186,6 +186,44 @@ class ConversationArchiveStore extends ChangeNotifier {
     debugPrint('Conversation archived to Isar: ${conversation.title}');
   }
 
+  /// Update an existing conversation in the archive
+  Future<void> updateConversation(
+    String id,
+    List<ArchivedMessage> messages,
+    String title,
+  ) async {
+    final numId = int.tryParse(id);
+    if (numId == null) return;
+
+    // Update in database
+    final conversationDB = ConversationDB()
+      ..id = numId
+      ..timestamp = DateTime.now()
+      ..title = title
+      ..isArchived = true
+      ..messages = messages.map((m) => MessageDB()
+        ..content = m.content
+        ..isUser = m.isUser
+        ..timestamp = m.timestamp
+      ).toList();
+    
+    await _repository.save(conversationDB);
+    
+    // Update in-memory list
+    final index = _archives.indexWhere((conv) => conv.id == id);
+    if (index != -1) {
+      _archives[index] = ArchivedConversation(
+        id: id,
+        timestamp: DateTime.now(),
+        title: title,
+        messages: messages,
+      );
+      notifyListeners();
+    }
+    
+    debugPrint('Conversation updated in Isar: $title');
+  }
+
   /// Remove a conversation from the archive
   Future<void> deleteConversation(String id) async {
     final numId = int.tryParse(id);
