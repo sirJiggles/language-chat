@@ -20,10 +20,8 @@ class ChatBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
           color: isUser
-              ? Theme.of(context)
-                    .colorScheme
-                    .tertiary // Slightly transparent blue for user
-              : const Color(0xFF372963), // Lighter purple for bot messages
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.secondary,
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Column(
@@ -33,22 +31,15 @@ class ChatBubble extends StatelessWidget {
             isUser
                 ? Text(
                     message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      height: 1.4,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 13),
                   )
                 : Consumer<WordDefinitionService>(
                     builder: (context, definitionService, _) {
                       return SelectableWordText(
                         text: message,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 12,
-                          height: 1.4,
-                          fontStyle: FontStyle.italic,
+                          color: Theme.of(context).colorScheme.onSecondary,
+                          fontSize: 13,
                         ),
                         definitionService: definitionService,
                       );
@@ -83,10 +74,10 @@ class ChatBubble extends StatelessWidget {
                         color: isThisMessagePlaying
                             ? Theme.of(context)
                                   .colorScheme
-                                  .tertiary // Brighter when speaking
+                                  .onPrimary // Brighter when speaking
                             : Theme.of(
                                 context,
-                              ).colorScheme.tertiary.withOpacity(0.3), // Normal color
+                              ).colorScheme.onPrimary.withOpacity(0.8), // Normal color
                       ),
                       constraints: const BoxConstraints(maxHeight: 20, maxWidth: 20),
                       padding: EdgeInsets.zero,
@@ -136,7 +127,7 @@ class ThinkingBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
-          color: const Color(0xFF372963).withOpacity(0.9),
+          color: Theme.of(context).colorScheme.secondary.withOpacity(0.9),
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: SizedBox(
@@ -191,8 +182,8 @@ class _ThinkingDotsState extends State<_ThinkingDots> with SingleTickerProviderS
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: on
-                      ? Theme.of(context).colorScheme.secondary
-                      : Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onPrimary.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
               );

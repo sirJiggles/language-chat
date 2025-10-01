@@ -1,18 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:language_learning_chat/profile/student_profile_view.dart';
 import 'package:provider/provider.dart';
 import '../models/settings_model.dart';
 import '../services/chat_service.dart';
 import '../services/context_manager.dart';
-import '../services/speech_service.dart';
+import '../services/whisper_speech_service.dart';
 import '../services/tts_service.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_drawer.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/thinking_dots.dart';
-import '../widgets/tiled_background.dart';
+import '../widgets/icon_tiled_background.dart';
 import 'settings_screen.dart';
-import '../debug/debug_menu.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -100,7 +100,7 @@ class ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initializeServices() async {
-    final speechService = context.read<SpeechService>();
+    final speechService = context.read<WhisperSpeechService>();
     final ttsService = context.read<TtsService>();
     final chatService = context.read<ChatService>();
 
@@ -138,18 +138,28 @@ class ChatScreenState extends State<ChatScreen> {
     if (settings.audioEnabled) {
       // Speak the response (don't await - let it play in background)
       try {
-        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '');
-        // Start audio (don't await)
-        ttsService.speak(cleanResponse);
-        // Give a tiny delay for audio to start, then reveal message
-        await Future.delayed(const Duration(milliseconds: 200));
+        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
+        debugPrint(
+          'ChatScreen: Audio enabled, speaking response (length: ${cleanResponse.length})',
+        );
+
+        if (cleanResponse.isNotEmpty) {
+          // Start audio (don't await - let it play in background)
+          ttsService.speak(cleanResponse);
+          // Give a tiny delay for audio to start, then reveal message
+          await Future.delayed(const Duration(milliseconds: 200));
+        } else {
+          debugPrint('ChatScreen: Response empty after cleaning, skipping TTS');
+        }
+
         chatService.revealBotMessage();
       } catch (e) {
-        debugPrint('Error speaking response: $e');
+        debugPrint('ChatScreen: Error speaking response: $e');
         // On error, reveal message anyway
         chatService.revealBotMessage();
       }
     } else {
+      debugPrint('ChatScreen: Audio disabled, revealing message immediately');
       // Audio disabled, reveal immediately
       chatService.revealBotMessage();
     }
@@ -176,6 +186,7 @@ class ChatScreenState extends State<ChatScreen> {
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: ClipRRect(
           child: BackdropFilter(
+            // we only want to blur the app bar if we are in dark mode
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: AppBar(
               backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -194,10 +205,10 @@ class ChatScreenState extends State<ChatScreen> {
                       Navigator.of(
                         context,
                       ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                    } else if (value == 'debug') {
+                    } else if (value == 'profile') {
                       Navigator.of(
                         context,
-                      ).push(MaterialPageRoute(builder: (_) => const DebugMenu()));
+                      ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
                     } else if (value == 'new_chat') {
                       _confirmNewChat(context);
                     }
@@ -210,15 +221,15 @@ class ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     const PopupMenuItem<String>(
-                      value: 'settings',
+                      value: 'profile',
                       child: Row(
-                        children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
+                        children: [Icon(Icons.person), SizedBox(width: 12), Text('My Profile')],
                       ),
                     ),
                     const PopupMenuItem<String>(
-                      value: 'debug',
+                      value: 'settings',
                       child: Row(
-                        children: [Icon(Icons.bug_report), SizedBox(width: 12), Text('Debug Menu')],
+                        children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
                       ),
                     ),
                   ],
@@ -229,10 +240,11 @@ class ChatScreenState extends State<ChatScreen> {
         ),
       ),
       drawer: ChatDrawer(onNewChat: () => _confirmNewChat(context)),
-      body: TiledBackground(
-        assetPath: 'assets/tile.png',
-        overlayOpacity: 0.5,
-        overlayColor: const Color(0xFF261D45), // Purple overlay matching the theme
+      body: IconTiledBackground(
+        overlayOpacity: 0.8,
+        spacing: 50,
+        iconSize: 25.0,
+        iconOpacity: 1,
         child: Stack(
           children: [
             // Main chat content (full screen)

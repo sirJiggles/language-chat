@@ -5,6 +5,7 @@ class TiledBackground extends StatelessWidget {
   final Widget child;
   final double overlayOpacity;
   final Color overlayColor;
+  final double scale;
 
   const TiledBackground({
     super.key,
@@ -12,6 +13,7 @@ class TiledBackground extends StatelessWidget {
     required this.child,
     this.overlayOpacity = 0.3,
     this.overlayColor = Colors.black,
+    this.scale = 1.0,
   });
 
   @override
@@ -25,6 +27,7 @@ class TiledBackground extends StatelessWidget {
               image: DecorationImage(
                 image: AssetImage(assetPath),
                 repeat: ImageRepeat.repeat,
+                scale: scale,
               ),
             ),
           ),

@@ -34,16 +34,26 @@ class ArchiveScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.archive_outlined, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  Icon(
+                    Icons.archive_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No archived conversations yet',
-                    style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Start a new conversation to archive your current one',
-                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -71,9 +81,7 @@ class ArchiveScreen extends StatelessWidget {
   void _viewArchive(BuildContext context, ArchivedConversation archive) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => _ArchiveDetailScreen(archive: archive),
-      ),
+      MaterialPageRoute(builder: (_) => _ArchiveDetailScreen(archive: archive)),
     );
   }
 
@@ -88,17 +96,14 @@ class ArchiveScreen extends StatelessWidget {
         title: const Text('Delete Conversation'),
         content: Text('Delete "${archive.title}"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               store.deleteConversation(archive.id);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Conversation deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Conversation deleted')));
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
@@ -114,17 +119,14 @@ class ArchiveScreen extends StatelessWidget {
         title: const Text('Clear All Archives'),
         content: const Text('Delete all archived conversations? This cannot be undone.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               store.clearAll();
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('All archives cleared')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('All archives cleared')));
             },
             child: const Text('Clear All', style: TextStyle(color: Colors.red)),
           ),
@@ -139,11 +141,7 @@ class _ArchiveCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onTap;
 
-  const _ArchiveCard({
-    required this.archive,
-    required this.onDelete,
-    required this.onTap,
-  });
+  const _ArchiveCard({required this.archive, required this.onDelete, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -172,11 +170,17 @@ class _ArchiveCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               dateStr,
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
             Text(
               '$messageCount messages',
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ],
         ),
@@ -192,7 +196,7 @@ class _ArchiveCard extends StatelessWidget {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inDays == 0) {
       return 'Today • ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
     } else if (diff.inDays == 1) {
@@ -215,9 +219,7 @@ class _ArchiveDetailScreen extends StatelessWidget {
     final dateStr = _formatDetailDate(archive.timestamp);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(archive.title),
-      ),
+      appBar: AppBar(title: Text(archive.title)),
       body: Column(
         children: [
           // Header with date
@@ -263,7 +265,20 @@ class _ArchiveDetailScreen extends StatelessWidget {
   }
 
   String _formatDetailDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
     return '${months[date.month - 1]} ${date.day}, ${date.year} • $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
@@ -282,13 +297,11 @@ class _ArchivedMessageBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
           color: message.isUser
               ? Theme.of(context).colorScheme.tertiary.withOpacity(0.9)
-              : const Color(0xFF372963).withOpacity(0.9),
+              : Theme.of(context).colorScheme.secondary.withOpacity(0.9),
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Text(

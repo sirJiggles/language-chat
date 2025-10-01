@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'screens/chat_screen.dart';
 import 'services/chat_service.dart';
-import 'services/speech_service.dart';
+import 'services/whisper_speech_service.dart';
 import 'services/tts_service.dart';
 import 'services/context_manager.dart';
 import 'services/assessment_service.dart';
@@ -89,7 +89,11 @@ void main() async {
             openaiApiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
           ),
         ),
-        ChangeNotifierProvider(create: (_) => SpeechService()),
+        ChangeNotifierProvider(
+          create: (_) => WhisperSpeechService(
+            apiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (context) => TtsService(
             settingsModel: settingsModel,
@@ -107,54 +111,96 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Define our custom colors based on cyberpunk theme
-    const primaryColor = Color(0xFF00FF9C); // Bright cyan-green as primary
-    const secondaryColor = Color(0xFF00ffc8); // Cyan as secondary
-    const tertiaryColor = Color(0xFF3d81fe); // Blue as tertiary
+    return Consumer<SettingsModel>(
+      builder: (context, settings, _) {
+        return MaterialApp(
+          title: 'Language Chat',
+          debugShowCheckedModeBanner: false,
+          theme: _buildLightTheme(),
+          darkTheme: _buildDarkTheme(),
+          themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          home: const ChatScreen(),
+        );
+      },
+    );
+  }
 
-    // Create regular DankMono text theme (not italic)
-    final baseTextTheme = ThemeData.dark().textTheme;
-    final dankMonoTextTheme = baseTextTheme.apply(fontFamily: 'DankMono');
+  ThemeData _buildLightTheme() {
+    // Blue Material Design theme - light mode
+    const primary = Color(0xFF36618E); // Blue
+    const secondary = Color(0xFF535F70); // Blue-gray
+    const tertiary = Color(0xFF6B5778); // Purple
+    const surface = Color(0xFFF8F9FF); // Light blue-white
+    
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.light(
+        primary: primary,
+        secondary: secondary,
+        tertiary: tertiary,
+        surface: surface,
+        background: surface,
+        onPrimary: const Color(0xFFFFFFFF),
+        onSecondary: const Color(0xFFFFFFFF),
+        onTertiary: const Color(0xFFFFFFFF),
+        onSurface: const Color(0xFF191C20),
+        onBackground: const Color(0xFF191C20),
+        surfaceVariant: const Color(0xFFE1E2E8),
+        outline: const Color(0xFF73777F),
+        outlineVariant: const Color(0xFFC3C7CF),
+        primaryContainer: const Color(0xFFD1E4FF),
+        secondaryContainer: const Color(0xFFD7E3F7),
+        tertiaryContainer: const Color(0xFFF2DAFF),
+      ),
+      cardColor: surface,
+      scaffoldBackgroundColor: surface,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFF8F9FF),
+        foregroundColor: Color(0xFF191C20),
+        elevation: 0,
+        centerTitle: false,
+      ),
+    );
+  }
 
-    return MaterialApp(
-      title: 'Language Chat',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.dark(
-          primary: primaryColor,
-          secondary: secondaryColor,
-          tertiary: tertiaryColor,
-          surface: const Color(0xFF261D45), // Purple-ish dark background
-          background: const Color(0xFF261D45),
-          onPrimary: const Color(0xFF001107), // Dark text on bright primary
-          onSecondary: const Color(0xFF001107),
-          onTertiary: Colors.white,
-          surfaceVariant: const Color(0xFF372963), // Lighter purple for cards
-        ),
-        useMaterial3: true,
-        textTheme: dankMonoTextTheme,
-        cardColor: const Color(0xFF372963), // Lighter purple for cards
-        dialogBackgroundColor: const Color(0xFF372963),
+  ThemeData _buildDarkTheme() {
+    // Blue Material Design theme - dark mode
+    const primary = Color(0xFFA0CAFD); // Light blue
+    const secondary = Color(0xFFBBC7DB); // Light blue-gray
+    const tertiary = Color(0xFFD6BEE4); // Light purple
+    const surface = Color(0xFF111418); // Very dark
+    const background = Color(0xFF0B0E13); // Darker
+    
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.dark(
+        primary: primary,
+        secondary: secondary,
+        tertiary: tertiary,
+        surface: surface,
+        background: background,
+        onPrimary: const Color(0xFF003258),
+        onSecondary: const Color(0xFF253140),
+        onTertiary: const Color(0xFF3B2948),
+        onSurface: const Color(0xFFE1E2E8),
+        onBackground: const Color(0xFFE1E2E8),
+        surfaceVariant: const Color(0xFF43474E),
+        outline: const Color(0xFF8D9199),
+        outlineVariant: const Color(0xFF43474E),
+        primaryContainer: const Color(0xFF194975),
+        secondaryContainer: const Color(0xFF3B4858),
+        tertiaryContainer: const Color(0xFF523F5F),
       ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.dark(
-          primary: primaryColor,
-          secondary: secondaryColor,
-          tertiary: tertiaryColor,
-          surface: const Color(0xFF261D45), // Purple-ish dark background
-          background: const Color(0xFF261D45),
-          onPrimary: const Color(0xFF001107), // Dark text on bright primary
-          onSecondary: const Color(0xFF001107),
-          onTertiary: Colors.white,
-          surfaceVariant: const Color(0xFF372963), // Lighter purple for cards
-        ),
-        useMaterial3: true,
-        textTheme: dankMonoTextTheme,
-        cardColor: const Color(0xFF372963), // Lighter purple for cards
-        dialogBackgroundColor: const Color(0xFF372963),
+      cardColor: surface,
+      scaffoldBackgroundColor: background,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF111418),
+        foregroundColor: Color(0xFFE1E2E8),
+        elevation: 0,
+        centerTitle: false,
       ),
-      themeMode: ThemeMode.dark, // Force dark mode
-      home: const ChatScreen(),
     );
   }
 }

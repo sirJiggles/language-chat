@@ -1,10 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/speech_service.dart';
+import '../services/whisper_speech_service.dart';
 import 'mic_button.dart';
 
-class ChatInputBar extends StatelessWidget {
+class ChatInputBar extends StatefulWidget {
   final TextEditingController textController;
   final VoidCallback onSendMessage;
   final VoidCallback onScrollToBottom;
@@ -17,6 +17,34 @@ class ChatInputBar extends StatelessWidget {
   });
 
   @override
+  State<ChatInputBar> createState() => _ChatInputBarState();
+}
+
+class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  String _lastTranscription = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -26,13 +54,23 @@ class ChatInputBar extends StatelessWidget {
         child: Container(
           color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
           padding: EdgeInsets.fromLTRB(8.0, 20.0, 8.0, bottomPadding + 8.0),
-          child: Consumer<SpeechService>(
+          child: Consumer<WhisperSpeechService>(
             builder: (context, speechService, _) {
               final isListening = speechService.isListening;
+              final isTranscribing = speechService.isTranscribing;
 
-              // Update text field with speech as user speaks
-              if (isListening) {
-                textController.text = speechService.lastWords;
+              // Update text field when transcription completes
+              if (speechService.lastWords.isNotEmpty &&
+                  speechService.lastWords != _lastTranscription) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  widget.textController.text = speechService.lastWords;
+                  _lastTranscription = speechService.lastWords;
+                });
+              }
+
+              // Clear the last transcription when listening starts
+              if (isListening && _lastTranscription.isNotEmpty) {
+                _lastTranscription = '';
               }
 
               return Row(
@@ -55,36 +93,51 @@ class ChatInputBar extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: textController,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontStyle: FontStyle.italic,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText: 'Message',
-                                hintStyle: TextStyle(color: Colors.black38),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
-                                ),
-                              ),
-                              maxLines: null,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => onSendMessage(),
+                            child: AnimatedBuilder(
+                              animation: _pulseAnimation,
+                              builder: (context, child) {
+                                return TextField(
+                                  controller: widget.textController,
+                                  style: const TextStyle(color: Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: isListening
+                                        ? 'Listening...'
+                                        : isTranscribing
+                                        ? 'Transcribing...'
+                                        : 'Message',
+                                    hintStyle: TextStyle(
+                                      color: isListening
+                                          ? Colors.red.withOpacity(_pulseAnimation.value)
+                                          : isTranscribing
+                                          ? Colors.blue.withOpacity(0.6)
+                                          : Colors.black38,
+                                      fontWeight: isListening || isTranscribing
+                                          ? FontWeight.w500
+                                          : FontWeight.normal,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  maxLines: null,
+                                  textInputAction: TextInputAction.send,
+                                  onSubmitted: (_) => widget.onSendMessage(),
+                                );
+                              },
                             ),
                           ),
                           // Clear button
                           ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: textController,
+                            valueListenable: widget.textController,
                             builder: (context, value, child) {
                               if (value.text.isEmpty) return const SizedBox.shrink();
                               return IconButton(
                                 icon: const Icon(Icons.clear, size: 20),
                                 color: Colors.black54,
                                 onPressed: () {
-                                  textController.clear();
+                                  widget.textController.clear();
                                 },
                                 padding: const EdgeInsets.all(8),
                                 constraints: const BoxConstraints(),
@@ -98,7 +151,7 @@ class ChatInputBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Mic/Send button
                   ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: textController,
+                    valueListenable: widget.textController,
                     builder: (context, value, child) {
                       final hasText = value.text.trim().isNotEmpty;
 
@@ -107,9 +160,9 @@ class ChatInputBar extends StatelessWidget {
                       return SizedBox(
                         width: 48,
                         height: 48,
-                        child: (hasText && !isListening)
+                        child: (hasText && !isListening && !isTranscribing)
                             ? IconButton(
-                                onPressed: onSendMessage,
+                                onPressed: widget.onSendMessage,
                                 icon: Container(
                                   width: 48,
                                   height: 48,
@@ -132,7 +185,7 @@ class ChatInputBar extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                               )
-                            : MicButton(onScrollToBottom: onScrollToBottom),
+                            : MicButton(onScrollToBottom: widget.onScrollToBottom),
                       );
                     },
                   ),

@@ -72,6 +72,16 @@ class StudentProfileStore extends ChangeNotifier {
     notifyListeners();
   }
   
+  /// Update a profile item within a category
+  Future<void> updateProfileItem(String category, String key, dynamic value) async {
+    await setValue(key, value);
+  }
+  
+  /// Remove a profile item from a category
+  Future<void> removeProfileItem(String category, String key) async {
+    await removeValue(key);
+  }
+  
   /// Clear all profile data
   Future<void> clearProfile() async {
     _profile.clear();

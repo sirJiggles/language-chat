@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
-import '../services/speech_service.dart';
+import '../services/whisper_speech_service.dart';
 import '../services/tts_service.dart';
 import 'sound_wave_animation.dart';
 
@@ -75,9 +74,10 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<SpeechService, ChatService, TtsService>(
+    return Consumer3<WhisperSpeechService, ChatService, TtsService>(
       builder: (context, speechService, chatService, ttsService, _) {
         final isListening = speechService.isListening;
+        final isTranscribing = speechService.isTranscribing;
         final isSpeaking = ttsService.isSpeaking;
 
         // Debug logs to track TTS state
@@ -89,7 +89,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
             : (_isSpeaking
                   ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.primary);
-        final iconColor = const Color(0xFF261D45); // Purple icon color matching theme
+        final iconColor = Theme.of(context).colorScheme.onPrimary;
 
         return GestureDetector(
           onTapDown: (_) async {
@@ -118,7 +118,8 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
               return;
             }
             if (speechService.isListening) {
-              await speechService.stopListening();
+              // Pass cancel flag to skip transcription if cancelled
+              await speechService.stopListening(skipTranscription: _cancelRecording);
 
               // If canceled (swiped up), clear the text
               if (_cancelRecording) {
@@ -138,7 +139,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
               return;
             }
             if (speechService.isListening) {
-              await speechService.stopListening();
+              await speechService.stopListening(skipTranscription: true);
               speechService.clearLastWords();
               if (mounted) setState(() => _cancelRecording = false);
             }
@@ -192,10 +193,12 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Show sound wave animation when bot is talking, otherwise show mic icon
+                      // Show sound wave animation when bot is talking
+                      // Show loading spinner when transcribing
+                      // Otherwise show mic icon
                       _isSpeaking
-                          ? const SoundWaveAnimation(
-                              color: Color(0xFF261D45), // Purple wave matching theme
+                          ? SoundWaveAnimation(
+                              color: Theme.of(context).colorScheme.onPrimary,
                               size: 48,
                               barCount: 9,
                               barWidth: 2.0,
@@ -204,6 +207,15 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                               maxBarHeight: 18.0,
                               animationDuration: Duration(milliseconds: 200),
                             )
+                          : isTranscribing
+                          ? SizedBox(
+                              width: iconSize,
+                              height: iconSize,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+                              ),
+                            )
                           : Icon(Icons.mic, size: iconSize, color: iconColor),
                       if (_cancelRecording && isListening && size > 60)
                         Positioned(
@@ -211,7 +223,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                           child: Icon(
                             Icons.cancel,
                             size: size * 0.225,
-                            color: const Color(0xFF261D45),
+                            color: Theme.of(context).colorScheme.onSecondary,
                           ),
                         ),
                     ],

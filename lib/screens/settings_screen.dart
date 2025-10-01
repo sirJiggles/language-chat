@@ -28,20 +28,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedOpenAIVoice = 'nova';
   String _selectedNativeLanguage = 'English';
   bool _audioEnabled = true;
+  bool _isDarkMode = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettings());
+    _loadSettings();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload settings when returning to this screen
+    _loadSettings();
   }
 
   void _loadSettings() {
     final chat = context.read<ChatService>();
     final settings = context.read<SettingsModel>();
-    _selectedLanguage = chat.targetLanguage;
-    _audioEnabled = settings.audioEnabled;
-    _selectedOpenAIVoice = settings.openaiTtsVoice;
-    _selectedNativeLanguage = settings.nativeLanguage;
+    if (mounted) {
+      setState(() {
+        _selectedLanguage = chat.targetLanguage;
+        _audioEnabled = settings.audioEnabled;
+        _selectedOpenAIVoice = settings.openaiTtsVoice;
+        _selectedNativeLanguage = settings.nativeLanguage;
+        _isDarkMode = settings.isDarkMode;
+      });
+    }
   }
 
   @override
@@ -64,6 +77,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) {
               if (value != null) {
                 setState(() => _selectedLanguage = value);
+                final chat = context.read<ChatService>();
+                final tts = context.read<TtsService>();
+                chat.setTargetLanguage(value);
+                tts.setPreferredLanguage(value);
               }
             },
             decoration: InputDecoration(
@@ -88,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) {
               if (value != null) {
                 setState(() => _selectedNativeLanguage = value);
+                context.read<SettingsModel>().setNativeLanguage(value);
               }
             },
             decoration: InputDecoration(
@@ -101,13 +119,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           
-          // Audio Toggle
+          // Appearance Section
+          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('Dark Mode'),
+            subtitle: const Text('Use dark theme'),
+            value: _isDarkMode,
+            onChanged: (value) {
+              setState(() => _isDarkMode = value);
+              context.read<SettingsModel>().setDarkMode(value);
+            },
+            activeColor: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 24),
+          
+          // Audio Section
+          Text('Audio', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
           SwitchListTile(
             title: const Text('Enable Audio'),
             subtitle: const Text('Play bot responses with voice'),
             value: _audioEnabled,
             onChanged: (value) {
               setState(() => _audioEnabled = value);
+              context.read<SettingsModel>().setAudioEnabled(value);
             },
             activeColor: Theme.of(context).colorScheme.primary,
           ),
@@ -127,6 +163,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) {
                 if (value != null) {
                   setState(() => _selectedOpenAIVoice = value);
+                  final tts = context.read<TtsService>();
+                  final settings = context.read<SettingsModel>();
+                  tts.setOpenAIVoice(value);
+                  settings.setOpenAITtsVoice(value);
                 }
               },
               decoration: InputDecoration(
@@ -176,20 +216,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
           
-          // Apply Button
-          ElevatedButton.icon(
-            onPressed: _apply,
-            icon: const Icon(Icons.save),
-            label: const Text('Apply'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
-          ),
-          
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 16),
           
@@ -299,28 +328,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _apply() {
-    final chat = context.read<ChatService>();
-    final tts = context.read<TtsService>();
-    final settings = context.read<SettingsModel>();
-
-    // Apply language
-    chat.setTargetLanguage(_selectedLanguage);
-    tts.setPreferredLanguage(_selectedLanguage);
-    
-    // Apply native language
-    settings.setNativeLanguage(_selectedNativeLanguage);
-    
-    // Apply audio enabled setting
-    settings.setAudioEnabled(_audioEnabled);
-    
-    // Apply OpenAI voice (always using OpenAI TTS now)
-    tts.setTtsProvider(TtsProvider.openai);
-    tts.setOpenAIVoice(_selectedOpenAIVoice);
-    settings.setOpenAITtsVoice(_selectedOpenAIVoice);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Settings applied')),
-    );
-  }
 }

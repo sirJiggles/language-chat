@@ -42,8 +42,8 @@ class _ThinkingDotsState extends State<ThinkingDots> with SingleTickerProviderSt
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: on
-                      ? Theme.of(context).colorScheme.secondary
-                      : Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onPrimary.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
               );
