@@ -257,7 +257,13 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
     String errorSummary,
     int messageCount,
   ) async {
-    final prompt = '''Analyze this student's $targetLanguage proficiency based on comprehensive data:
+    // Include self-assessed level if available
+    final selfAssessedLevel = _profileStore.getValue('self_assessed_level');
+    final selfAssessmentContext = selfAssessedLevel != null
+        ? '\n\nSTUDENT\'S SELF-ASSESSMENT: $selfAssessedLevel\nNote: The student believes they are at $selfAssessedLevel level. Consider this but assess objectively based on evidence.'
+        : '';
+    
+    final prompt = '''Analyze this student's $targetLanguage proficiency based on comprehensive data:$selfAssessmentContext
 
 CONVERSATION HISTORY (last 20 messages):
 $conversationHistory
@@ -337,32 +343,86 @@ AREAS_FOR_IMPROVEMENT: [key areas to work on]''';
   
   /// Save assessment to database
   Future<void> _saveAssessment(Map<String, dynamic> assessment) async {
+    final assessedLevel = assessment['level'] as String;
+    final confidence = assessment['confidence'] as double;
+    
+    // Check if user has a self-assessed level
+    final selfAssessedLevel = _profileStore.getValue('self_assessed_level');
+    final selfAssessmentDateStr = _profileStore.getValue('self_assessment_date');
+    
+    bool shouldUpdateLevel = true;
+    String finalLevel = assessedLevel;
+    double finalConfidence = confidence;
+    
+    if (selfAssessedLevel != null && selfAssessmentDateStr != null) {
+      final selfAssessmentDate = DateTime.parse(selfAssessmentDateStr);
+      final daysSinceSelfAssessment = DateTime.now().difference(selfAssessmentDate).inDays;
+      
+      // Don't override self-assessment too quickly (within first 30 days or 100 messages)
+      if (daysSinceSelfAssessment < 30 || _messageCountInSession < 100) {
+        // Only update if we're very confident AND the change is small
+        final levelDiff = _getLevelDifference(selfAssessedLevel, assessedLevel);
+        
+        if (levelDiff.abs() <= 1 && confidence >= 0.8) {
+          // Allow change by 1 level if confidence is high
+          finalLevel = assessedLevel;
+          finalConfidence = confidence * 0.7; // Reduce confidence slightly
+          debugPrint('Allowing level change from $selfAssessedLevel to $assessedLevel (high confidence)');
+        } else if (levelDiff.abs() > 1) {
+          // Large difference - blend with self-assessment
+          finalLevel = selfAssessedLevel;
+          shouldUpdateLevel = false;
+          debugPrint('Preserving self-assessed level $selfAssessedLevel (AI suggested $assessedLevel, difference too large)');
+        } else {
+          // Keep self-assessed level
+          finalLevel = selfAssessedLevel;
+          shouldUpdateLevel = false;
+          debugPrint('Preserving self-assessed level $selfAssessedLevel (not enough confidence)');
+        }
+      } else {
+        // After 30 days or 100 messages, trust the AI assessment more
+        finalLevel = assessedLevel;
+        finalConfidence = confidence;
+      }
+    }
+    
     // Save to AssessmentDB
     final assessmentDB = AssessmentDB()
       ..timestamp = DateTime.now()
-      ..level = assessment['level']
-      ..confidence = assessment['confidence']
+      ..level = finalLevel
+      ..confidence = finalConfidence
       ..reasoning = assessment['reasoning']
       ..messageCount = assessment['messageCount'];
     
     await _assessmentRepo.saveAssessment(assessmentDB);
     
-    // Update level tracker
-    await _levelTracker.updateLevel(
-      assessment['level'],
-      assessment['reasoning'],
-      confidence: assessment['confidence'],
-    );
+    // Update level tracker only if we should
+    if (shouldUpdateLevel) {
+      await _levelTracker.updateLevel(
+        finalLevel,
+        assessment['reasoning'],
+        confidence: finalConfidence,
+      );
+    }
     
     // Update session summary
     if (_currentSessionId != null) {
       final session = await _sessionRepo.getSummaryBySessionId(_currentSessionId!);
       if (session != null) {
-        session.assessedLevel = assessment['level'];
+        session.assessedLevel = finalLevel;
         session.lastAssessmentTime = DateTime.now();
         await _sessionRepo.saveSummary(session);
       }
     }
+  }
+  
+  /// Get the difference between two CEFR levels (e.g., A1 to B2 = 3)
+  int _getLevelDifference(String level1, String level2) {
+    const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+    final index1 = levels.indexOf(level1);
+    final index2 = levels.indexOf(level2);
+    if (index1 == -1 || index2 == -1) return 0;
+    return index2 - index1;
   }
   
   /// Extract facts using AI (separate call, still useful)

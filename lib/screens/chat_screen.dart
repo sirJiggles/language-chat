@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:language_learning_chat/profile/student_profile_view.dart';
 import 'package:provider/provider.dart';
 import '../models/settings_model.dart';
+import '../models/student_profile_store.dart';
 import '../services/chat_service.dart';
 import '../services/context_manager.dart';
 import '../services/whisper_speech_service.dart';
@@ -13,6 +14,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/thinking_dots.dart';
 import '../widgets/icon_tiled_background.dart';
 import 'settings_screen.dart';
+import 'onboarding_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -56,10 +58,25 @@ class ChatScreenState extends State<ChatScreen> {
   // Start the conversation with the bot greeting automatically
   Future<void> _checkForInitialAssessment() async {
     final contextManager = Provider.of<ContextManager>(context, listen: false);
+    final profileStore = Provider.of<StudentProfileStore>(context, listen: false);
     final ttsService = Provider.of<TtsService>(context, listen: false);
 
     // Wait a moment to ensure the context manager is fully initialized
     await Future.delayed(const Duration(milliseconds: 800));
+    
+    // Check if user has completed onboarding
+    final onboardingCompleted = profileStore.getValue('onboarding_completed');
+    if (onboardingCompleted == null && !_botGreetingSent) {
+      // Show onboarding screen
+      if (mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const OnboardingScreen(),
+            fullscreenDialog: true,
+          ),
+        );
+      }
+    }
 
     if (contextManager.isInitialized && !_botGreetingSent) {
       setState(() {
