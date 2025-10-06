@@ -15,6 +15,7 @@ import '../widgets/thinking_dots.dart';
 import '../widgets/icon_tiled_background.dart';
 import 'settings_screen.dart';
 import 'onboarding_screen.dart';
+import 'language_selection_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -67,12 +68,23 @@ class ChatScreenState extends State<ChatScreen> {
     // Check if user has completed onboarding
     final onboardingCompleted = profileStore.getValue('onboarding_completed');
     if (onboardingCompleted == null && !_botGreetingSent) {
-      // Show onboarding screen
+      // Show language selection first
       if (mounted) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const OnboardingScreen(),
-            fullscreenDialog: true,
+            builder: (_) => LanguageSelectionScreen(
+              onLanguagesSelected: (nativeLanguage, targetLanguage) async {
+                // Navigate to level selection screen
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => OnboardingScreen(
+                      nativeLanguage: nativeLanguage,
+                      targetLanguage: targetLanguage,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         );
       }
