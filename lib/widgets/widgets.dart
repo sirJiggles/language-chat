@@ -7,3 +7,5 @@ export 'transcription_preview.dart';
 export 'icon_tiled_background.dart';
 export 'sound_wave_animation.dart';
 export 'selectable_word_text.dart';
+export 'audio_waveform.dart';
+export 'recording_bar.dart';
