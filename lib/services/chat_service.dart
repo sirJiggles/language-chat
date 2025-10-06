@@ -79,7 +79,7 @@ class ChatService extends ChangeNotifier {
       // Prepare context for the conversation
       String context = '';
       if (_contextManager.isInitialized) {
-        context = await _contextManager.getContextForPrompt();
+        context = _contextManager.getContextForPrompt();
       }
 
       // Prepare the prompt
@@ -249,13 +249,7 @@ class ChatService extends ChangeNotifier {
 
   void setTargetLanguage(String lang) {
     _targetLanguage = lang;
-
-    // Update student profile if available and context manager is initialized
-    if (_contextManager.isInitialized && _contextManager.studentProfile != null) {
-      _contextManager.studentProfile!.targetLanguage = lang;
-      _contextManager.saveStudentProfile();
-    }
-
+    // Note: Profile updates are now handled by StudentProfileStore
     notifyListeners();
   }
 }
