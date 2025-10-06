@@ -107,18 +107,27 @@ class ChatScreenState extends State<ChatScreen> {
     await speechService.initialize();
     await ttsService.initialize();
 
-    // Set the speech recognition locale to target language
     speechService.setLocaleFromLanguage(chatService.targetLanguage);
   }
 
   // Handle chat service updates
   void _handleChatServiceUpdate() {
-    // Schedule a scroll to bottom after the UI updates
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    
+    // Reset greeting flag if conversation is empty (user cleared/reset data)
+    if (chatService.conversationStore.messages.isEmpty && _botGreetingSent) {
+      setState(() {
+        _botGreetingSent = false;
+      });
+      // Trigger initial greeting again
+      _checkForInitialAssessment();
+    }
+    
+    // Auto-scroll to bottom when new messages arrive
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
   }
-
   Future<void> _sendTextMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -241,9 +250,9 @@ class ChatScreenState extends State<ChatScreen> {
       ),
       drawer: ChatDrawer(onNewChat: () => _confirmNewChat(context)),
       body: IconTiledBackground(
-        overlayOpacity: 0.8,
-        spacing: 50,
-        iconSize: 25.0,
+        overlayOpacity: 0.9,
+        spacing: 40,
+        iconSize: 18.0,
         iconOpacity: 1,
         child: Stack(
           children: [

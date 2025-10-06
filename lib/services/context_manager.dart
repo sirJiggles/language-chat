@@ -6,12 +6,9 @@ import 'package:path_provider/path_provider.dart';
 import '../models/student_profile.dart';
 import '../models/student_profile_store.dart';
 import '../models/language_level_tracker.dart';
-import 'level_assessment_service.dart';
 
 /// Manages context files and student profiles for the language learning app
 class ContextManager extends ChangeNotifier {
-  // Services
-  final LevelAssessmentService _levelAssessment = LevelAssessmentService();
 
   // New stores (optional for backward compatibility)
   StudentProfileStore? _profileStore;
@@ -315,81 +312,8 @@ class ContextManager extends ChangeNotifier {
     return levels.indexOf(level);
   }
 
-  // Save conversation summary
-  Future<void> saveConversationSummary(String conversation, String summary) async {
-    try {
-      final baseDir = await _getContextDirectory();
-      final summariesDir = Directory('${baseDir.path}/context/conversations');
-
-      debugPrint('Saving conversation summary to: ${summariesDir.path}');
-      if (!await summariesDir.exists()) {
-        await summariesDir.create(recursive: true);
-        debugPrint('Created conversations directory');
-      }
-
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final summaryFile = File('${summariesDir.path}/summary_$timestamp.md');
-      debugPrint('Writing conversation summary to: ${summaryFile.path}');
-
-      final content =
-          '''
-# Conversation Summary - ${DateTime.now().toString().split('.')[0]}
-
-## Summary
-$summary
-
-## Topics Covered
-${_extractTopics(conversation).join(', ')}
-
-## Language Level
-${_levelAssessment.assessLevel(conversation)}
-
-## New Vocabulary
-${_levelAssessment.extractVocabulary(conversation).join(', ')}
-
-## Grammar Points
-${_levelAssessment.extractGrammarPoints(conversation).join(', ')}
-
-## Full Conversation
-```
-$conversation
-```
-''';
-
-      await summaryFile.writeAsString(content);
-      debugPrint('Conversation summary saved successfully');
-    } catch (e) {
-      debugPrint('Error saving conversation summary: $e');
-    }
-  }
-
-  // Extract topics from conversation
-  List<String> _extractTopics(String conversation) {
-    // Simple implementation - in a real app, you'd use more sophisticated NLP
-    final commonTopics = [
-      'family',
-      'work',
-      'school',
-      'food',
-      'travel',
-      'hobbies',
-      'weather',
-      'sports',
-      'music',
-      'movies',
-      'books',
-      'technology',
-      'health',
-      'politics',
-      'culture',
-      'history',
-      'science',
-      'art',
-    ];
-
-    final lowerConversation = conversation.toLowerCase();
-    return commonTopics.where((topic) => lowerConversation.contains(topic)).toList();
-  }
+  // Note: Conversation summaries are now handled by ComprehensiveAssessmentService
+  // and stored in the database instead of files
 
   // Create a default profile when none exists
   Future<void> _createDefaultProfile() async {

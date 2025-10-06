@@ -4,6 +4,10 @@ import 'package:path_provider/path_provider.dart';
 import 'models/conversation_db.dart';
 import 'models/student_fact_db.dart';
 import 'models/assessment_db.dart';
+import 'models/message_metrics_db.dart';
+import 'models/session_summary_db.dart';
+import 'models/error_pattern_db.dart';
+import 'models/vocabulary_progress_db.dart';
 
 /// Service to manage Isar database initialization and access
 class DatabaseService {
@@ -36,6 +40,10 @@ class DatabaseService {
           StudentFactDBSchema,
           AssessmentDBSchema,
           LevelHistoryDBSchema,
+          MessageMetricsDBSchema,
+          SessionSummaryDBSchema,
+          ErrorPatternDBSchema,
+          VocabularyProgressDBSchema,
         ],
         directory: dir.path,
         name: 'language_learning_db',
@@ -67,6 +75,10 @@ class DatabaseService {
       'facts': await _isar!.studentFactDBs.count(),
       'assessments': await _isar!.assessmentDBs.count(),
       'levelHistory': await _isar!.levelHistoryDBs.count(),
+      'messageMetrics': await _isar!.messageMetricsDBs.count(),
+      'sessionSummaries': await _isar!.sessionSummaryDBs.count(),
+      'errorPatterns': await _isar!.errorPatternDBs.count(),
+      'vocabularyProgress': await _isar!.vocabularyProgressDBs.count(),
     };
   }
   

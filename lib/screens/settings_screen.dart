@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
+import '../services/comprehensive_assessment_service.dart';
 import '../services/tts_service.dart';
 import '../models/settings_model.dart';
 import '../models/student_profile_store.dart';
@@ -293,15 +294,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Clear all database data
       await DatabaseService.clearAllData();
       
-      // Clear current conversation
+      // Clear current conversation and start fresh
       final chatService = context.read<ChatService>();
-      chatService.clearConversation();
-      chatService.clearAssessment();
+      final assessmentService = context.read<ComprehensiveAssessmentService>();
+      final archiveStore = context.read<ConversationArchiveStore>();
+      
+      // Delete all archived conversations
+      await archiveStore.clearAll();
+      
+      await chatService.archiveAndStartNew();
+      await assessmentService.startNewSession();
       
       // Reload stores to reflect empty state
       final profileStore = context.read<StudentProfileStore>();
       final levelTracker = context.read<LanguageLevelTracker>();
-      final archiveStore = context.read<ConversationArchiveStore>();
       
       await profileStore.initialize();
       await levelTracker.initialize();
@@ -310,12 +316,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('All data deleted successfully'),
+          content: Text('All data deleted successfully. Starting new chat...'),
           backgroundColor: Colors.green,
         ),
       );
       
-      // Go back to chat screen
+      // Go back to chat screen with fresh session
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;

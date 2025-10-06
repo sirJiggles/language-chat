@@ -6,7 +6,7 @@ import 'services/chat_service.dart';
 import 'services/whisper_speech_service.dart';
 import 'services/tts_service.dart';
 import 'services/context_manager.dart';
-import 'services/assessment_service.dart';
+import 'services/comprehensive_assessment_service.dart';
 import 'services/word_definition_service.dart';
 import 'models/settings_model.dart';
 import 'models/student_profile_store.dart';
@@ -70,9 +70,9 @@ void main() async {
         ChangeNotifierProvider.value(value: archiveStore),
         Provider.value(value: wordDefinitionService),
 
-        // Create assessment service with new architecture
+        // Create comprehensive assessment service
         ChangeNotifierProvider(
-          create: (_) => AssessmentService(
+          create: (_) => ComprehensiveAssessmentService(
             apiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
             profileStore: profileStore,
             levelTracker: levelTracker,
@@ -84,7 +84,7 @@ void main() async {
           create: (context) => ChatService(
             targetLanguage: const String.fromEnvironment('TARGET_LANGUAGE', defaultValue: 'German'),
             contextManager: contextManager,
-            assessmentService: Provider.of<AssessmentService>(context, listen: false),
+            assessmentService: Provider.of<ComprehensiveAssessmentService>(context, listen: false),
             archiveStore: archiveStore,
             openaiApiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
           ),

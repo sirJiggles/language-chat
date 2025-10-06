@@ -5,11 +5,11 @@ import '../models/message.dart';
 import '../models/message_store.dart';
 import '../models/conversation_archive.dart';
 import 'context_manager.dart';
-import 'assessment_service.dart';
+import 'comprehensive_assessment_service.dart';
 
 class ChatService extends ChangeNotifier {
   final ContextManager _contextManager;
-  final AssessmentService _assessmentService;
+  final ComprehensiveAssessmentService _assessmentService;
   final ConversationArchiveStore? _archiveStore;
   final String? _openaiApiKey;
 
@@ -19,7 +19,7 @@ class ChatService extends ChangeNotifier {
 
   ChatService({
     required ContextManager contextManager,
-    required AssessmentService assessmentService,
+    required ComprehensiveAssessmentService assessmentService,
     ConversationArchiveStore? archiveStore,
     String? openaiApiKey,
     String targetLanguage = 'German',
@@ -101,17 +101,13 @@ class ChatService extends ChangeNotifier {
       // It will be removed when audio starts or immediately if audio is disabled
       _lastResponse = assistantMessage;
 
-      // Perform background assessment - use the original message for assessment
-      await _assessmentService.performBackgroundAssessment(
+      // Process conversation for comprehensive assessment
+      await _assessmentService.processConversation(
         message,
         assistantMessage,
         _targetLanguage,
         hideUserMessage: hideUserMessage,
       );
-      // Add assessment messages to the assessment store
-      if (_assessmentService.lastAssessmentMessage != null) {
-        _assessmentStore.addMessage(_assessmentService.lastAssessmentMessage!);
-      }
 
       // Notify listeners to update UI
       notifyListeners();
