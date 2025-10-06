@@ -32,6 +32,9 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
   int _messageCountInSession = 0;
   DateTime? _lastComprehensiveAssessment;
   
+  // Getters
+  String get currentSessionId => _currentSessionId ?? '';
+  
   // Configuration
   static const int _comprehensiveAssessmentInterval = 20; // Every 20 messages
   static const int _minMessagesForAssessment = 10; // Need at least 10 messages
@@ -70,6 +73,7 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
       ..avgMessageLength = 0.0
       ..totalErrors = 0
       ..errorRate = 0.0
+      ..totalClarificationRequests = 0
       ..topicsDiscussed = []
       ..newVocabulary = []
       ..grammarPointsUsed = [];
@@ -140,9 +144,30 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
       ..grammarStructures = []  // Could be populated by AI later
       ..errorCount = 0  // Would need AI analysis
       ..errorTypes = []
-      ..userMessage = userMessage;
+      ..userMessage = userMessage
+      ..clarificationRequestCount = 0;
     
     await _metricsRepo.saveMetrics(metrics);
+  }
+  
+  /// Increment clarification count for the most recent message in session
+  Future<void> incrementClarificationCount(String sessionId) async {
+    final metrics = await _metricsRepo.getMetricsBySession(sessionId);
+    
+    if (metrics.isEmpty) return;
+    
+    // Get the most recent metrics entry
+    final latestMetrics = metrics.reduce((curr, next) => 
+      curr.timestamp.isAfter(next.timestamp) ? curr : next
+    );
+    
+    // Increment the count
+    latestMetrics.clarificationRequestCount += 1;
+    
+    // Save back to database
+    await _metricsRepo.saveMetrics(latestMetrics);
+    
+    debugPrint('Incremented clarification count to ${latestMetrics.clarificationRequestCount} for session $sessionId');
   }
   
   /// Update session summary with latest data
@@ -154,11 +179,13 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
     
     // Calculate aggregates
     int totalWords = 0;
+    int totalClarifications = 0;
     Set<String> allUniqueWords = {};
     
     for (final metric in metrics) {
       totalWords += metric.wordCount;
       allUniqueWords.addAll(metric.vocabularyUsed);
+      totalClarifications += metric.clarificationRequestCount;
     }
     
     session.totalMessages = metrics.length;
@@ -170,6 +197,7 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
     session.avgMessageLength = metrics.isNotEmpty 
         ? totalWords / metrics.length 
         : 0.0;
+    session.totalClarificationRequests = totalClarifications;
     
     await _sessionRepo.saveSummary(session);
   }

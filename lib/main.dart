@@ -8,6 +8,7 @@ import 'services/tts_service.dart';
 import 'services/context_manager.dart';
 import 'services/comprehensive_assessment_service.dart';
 import 'services/word_definition_service.dart';
+import 'services/clarification_service.dart';
 import 'models/settings_model.dart';
 import 'models/student_profile_store.dart';
 import 'models/language_level_tracker.dart';
@@ -57,6 +58,11 @@ void main() async {
     openaiApiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
   );
 
+  // Create clarification service
+  final clarificationService = ClarificationService(
+    openaiApiKey: const String.fromEnvironment('OPENAI_API_KEY', defaultValue: ''),
+  );
+
   // Connect the new stores to the context manager
   contextManager.setStores(profileStore: profileStore, levelTracker: levelTracker);
 
@@ -69,6 +75,7 @@ void main() async {
         ChangeNotifierProvider.value(value: levelTracker),
         ChangeNotifierProvider.value(value: archiveStore),
         Provider.value(value: wordDefinitionService),
+        ChangeNotifierProvider.value(value: clarificationService),
 
         // Create comprehensive assessment service
         ChangeNotifierProvider(

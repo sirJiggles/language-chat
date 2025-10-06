@@ -67,28 +67,33 @@ const SessionSummaryDBSchema = CollectionSchema(
       name: r'topicsDiscussed',
       type: IsarType.stringList,
     ),
-    r'totalErrors': PropertySchema(
+    r'totalClarificationRequests': PropertySchema(
       id: 10,
+      name: r'totalClarificationRequests',
+      type: IsarType.long,
+    ),
+    r'totalErrors': PropertySchema(
+      id: 11,
       name: r'totalErrors',
       type: IsarType.long,
     ),
     r'totalMessages': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'totalMessages',
       type: IsarType.long,
     ),
     r'totalWords': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'totalWords',
       type: IsarType.long,
     ),
     r'uniqueWordsUsed': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'uniqueWordsUsed',
       type: IsarType.long,
     ),
     r'vocabularyDiversity': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'vocabularyDiversity',
       type: IsarType.double,
     )
@@ -187,11 +192,12 @@ void _sessionSummaryDBSerialize(
   writer.writeString(offsets[7], object.sessionId);
   writer.writeDateTime(offsets[8], object.startTime);
   writer.writeStringList(offsets[9], object.topicsDiscussed);
-  writer.writeLong(offsets[10], object.totalErrors);
-  writer.writeLong(offsets[11], object.totalMessages);
-  writer.writeLong(offsets[12], object.totalWords);
-  writer.writeLong(offsets[13], object.uniqueWordsUsed);
-  writer.writeDouble(offsets[14], object.vocabularyDiversity);
+  writer.writeLong(offsets[10], object.totalClarificationRequests);
+  writer.writeLong(offsets[11], object.totalErrors);
+  writer.writeLong(offsets[12], object.totalMessages);
+  writer.writeLong(offsets[13], object.totalWords);
+  writer.writeLong(offsets[14], object.uniqueWordsUsed);
+  writer.writeDouble(offsets[15], object.vocabularyDiversity);
 }
 
 SessionSummaryDB _sessionSummaryDBDeserialize(
@@ -212,11 +218,12 @@ SessionSummaryDB _sessionSummaryDBDeserialize(
   object.sessionId = reader.readString(offsets[7]);
   object.startTime = reader.readDateTime(offsets[8]);
   object.topicsDiscussed = reader.readStringList(offsets[9]) ?? [];
-  object.totalErrors = reader.readLong(offsets[10]);
-  object.totalMessages = reader.readLong(offsets[11]);
-  object.totalWords = reader.readLong(offsets[12]);
-  object.uniqueWordsUsed = reader.readLong(offsets[13]);
-  object.vocabularyDiversity = reader.readDouble(offsets[14]);
+  object.totalClarificationRequests = reader.readLong(offsets[10]);
+  object.totalErrors = reader.readLong(offsets[11]);
+  object.totalMessages = reader.readLong(offsets[12]);
+  object.totalWords = reader.readLong(offsets[13]);
+  object.uniqueWordsUsed = reader.readLong(offsets[14]);
+  object.vocabularyDiversity = reader.readDouble(offsets[15]);
   return object;
 }
 
@@ -256,6 +263,8 @@ P _sessionSummaryDBDeserializeProp<P>(
     case 13:
       return (reader.readLong(offset)) as P;
     case 14:
+      return (reader.readLong(offset)) as P;
+    case 15:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1920,6 +1929,62 @@ extension SessionSummaryDBQueryFilter
   }
 
   QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterFilterCondition>
+      totalClarificationRequestsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'totalClarificationRequests',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterFilterCondition>
+      totalClarificationRequestsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'totalClarificationRequests',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterFilterCondition>
+      totalClarificationRequestsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'totalClarificationRequests',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterFilterCondition>
+      totalClarificationRequestsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'totalClarificationRequests',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterFilterCondition>
       totalErrorsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -2317,6 +2382,20 @@ extension SessionSummaryDBQuerySortBy
   }
 
   QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
+      sortByTotalClarificationRequests() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalClarificationRequests', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
+      sortByTotalClarificationRequestsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalClarificationRequests', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
       sortByTotalErrors() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'totalErrors', Sort.asc);
@@ -2501,6 +2580,20 @@ extension SessionSummaryDBQuerySortThenBy
   }
 
   QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
+      thenByTotalClarificationRequests() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalClarificationRequests', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
+      thenByTotalClarificationRequestsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalClarificationRequests', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QAfterSortBy>
       thenByTotalErrors() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'totalErrors', Sort.asc);
@@ -2645,6 +2738,13 @@ extension SessionSummaryDBQueryWhereDistinct
   }
 
   QueryBuilder<SessionSummaryDB, SessionSummaryDB, QDistinct>
+      distinctByTotalClarificationRequests() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'totalClarificationRequests');
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, SessionSummaryDB, QDistinct>
       distinctByTotalErrors() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'totalErrors');
@@ -2753,6 +2853,13 @@ extension SessionSummaryDBQueryProperty
       topicsDiscussedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'topicsDiscussed');
+    });
+  }
+
+  QueryBuilder<SessionSummaryDB, int, QQueryOperations>
+      totalClarificationRequestsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'totalClarificationRequests');
     });
   }
 

@@ -27,53 +27,58 @@ const MessageMetricsDBSchema = CollectionSchema(
       name: r'avgWordLength',
       type: IsarType.double,
     ),
-    r'errorCount': PropertySchema(
+    r'clarificationRequestCount': PropertySchema(
       id: 2,
+      name: r'clarificationRequestCount',
+      type: IsarType.long,
+    ),
+    r'errorCount': PropertySchema(
+      id: 3,
       name: r'errorCount',
       type: IsarType.long,
     ),
     r'errorTypes': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'errorTypes',
       type: IsarType.stringList,
     ),
     r'grammarStructures': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'grammarStructures',
       type: IsarType.stringList,
     ),
     r'sentenceCount': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'sentenceCount',
       type: IsarType.long,
     ),
     r'sessionId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'sessionId',
       type: IsarType.string,
     ),
     r'timestamp': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'uniqueWordCount': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'uniqueWordCount',
       type: IsarType.long,
     ),
     r'userMessage': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'userMessage',
       type: IsarType.string,
     ),
     r'vocabularyUsed': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'vocabularyUsed',
       type: IsarType.stringList,
     ),
     r'wordCount': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'wordCount',
       type: IsarType.long,
     )
@@ -165,16 +170,17 @@ void _messageMetricsDBSerialize(
 ) {
   writer.writeString(offsets[0], object.aiResponse);
   writer.writeDouble(offsets[1], object.avgWordLength);
-  writer.writeLong(offsets[2], object.errorCount);
-  writer.writeStringList(offsets[3], object.errorTypes);
-  writer.writeStringList(offsets[4], object.grammarStructures);
-  writer.writeLong(offsets[5], object.sentenceCount);
-  writer.writeString(offsets[6], object.sessionId);
-  writer.writeDateTime(offsets[7], object.timestamp);
-  writer.writeLong(offsets[8], object.uniqueWordCount);
-  writer.writeString(offsets[9], object.userMessage);
-  writer.writeStringList(offsets[10], object.vocabularyUsed);
-  writer.writeLong(offsets[11], object.wordCount);
+  writer.writeLong(offsets[2], object.clarificationRequestCount);
+  writer.writeLong(offsets[3], object.errorCount);
+  writer.writeStringList(offsets[4], object.errorTypes);
+  writer.writeStringList(offsets[5], object.grammarStructures);
+  writer.writeLong(offsets[6], object.sentenceCount);
+  writer.writeString(offsets[7], object.sessionId);
+  writer.writeDateTime(offsets[8], object.timestamp);
+  writer.writeLong(offsets[9], object.uniqueWordCount);
+  writer.writeString(offsets[10], object.userMessage);
+  writer.writeStringList(offsets[11], object.vocabularyUsed);
+  writer.writeLong(offsets[12], object.wordCount);
 }
 
 MessageMetricsDB _messageMetricsDBDeserialize(
@@ -186,17 +192,18 @@ MessageMetricsDB _messageMetricsDBDeserialize(
   final object = MessageMetricsDB();
   object.aiResponse = reader.readStringOrNull(offsets[0]);
   object.avgWordLength = reader.readDouble(offsets[1]);
-  object.errorCount = reader.readLong(offsets[2]);
-  object.errorTypes = reader.readStringList(offsets[3]) ?? [];
-  object.grammarStructures = reader.readStringList(offsets[4]) ?? [];
+  object.clarificationRequestCount = reader.readLong(offsets[2]);
+  object.errorCount = reader.readLong(offsets[3]);
+  object.errorTypes = reader.readStringList(offsets[4]) ?? [];
+  object.grammarStructures = reader.readStringList(offsets[5]) ?? [];
   object.id = id;
-  object.sentenceCount = reader.readLong(offsets[5]);
-  object.sessionId = reader.readString(offsets[6]);
-  object.timestamp = reader.readDateTime(offsets[7]);
-  object.uniqueWordCount = reader.readLong(offsets[8]);
-  object.userMessage = reader.readString(offsets[9]);
-  object.vocabularyUsed = reader.readStringList(offsets[10]) ?? [];
-  object.wordCount = reader.readLong(offsets[11]);
+  object.sentenceCount = reader.readLong(offsets[6]);
+  object.sessionId = reader.readString(offsets[7]);
+  object.timestamp = reader.readDateTime(offsets[8]);
+  object.uniqueWordCount = reader.readLong(offsets[9]);
+  object.userMessage = reader.readString(offsets[10]);
+  object.vocabularyUsed = reader.readStringList(offsets[11]) ?? [];
+  object.wordCount = reader.readLong(offsets[12]);
   return object;
 }
 
@@ -214,22 +221,24 @@ P _messageMetricsDBDeserializeProp<P>(
     case 2:
       return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
       return (reader.readStringList(offset) ?? []) as P;
     case 5:
-      return (reader.readLong(offset)) as P;
-    case 6:
-      return (reader.readString(offset)) as P;
-    case 7:
-      return (reader.readDateTime(offset)) as P;
-    case 8:
-      return (reader.readLong(offset)) as P;
-    case 9:
-      return (reader.readString(offset)) as P;
-    case 10:
       return (reader.readStringList(offset) ?? []) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readDateTime(offset)) as P;
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
     case 11:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 12:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -692,6 +701,62 @@ extension MessageMetricsDBQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterFilterCondition>
+      clarificationRequestCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'clarificationRequestCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterFilterCondition>
+      clarificationRequestCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'clarificationRequestCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterFilterCondition>
+      clarificationRequestCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'clarificationRequestCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterFilterCondition>
+      clarificationRequestCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'clarificationRequestCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -2020,6 +2085,20 @@ extension MessageMetricsDBQuerySortBy
   }
 
   QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterSortBy>
+      sortByClarificationRequestCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clarificationRequestCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterSortBy>
+      sortByClarificationRequestCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clarificationRequestCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterSortBy>
       sortByErrorCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'errorCount', Sort.asc);
@@ -2145,6 +2224,20 @@ extension MessageMetricsDBQuerySortThenBy
       thenByAvgWordLengthDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'avgWordLength', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterSortBy>
+      thenByClarificationRequestCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clarificationRequestCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QAfterSortBy>
+      thenByClarificationRequestCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clarificationRequestCount', Sort.desc);
     });
   }
 
@@ -2277,6 +2370,13 @@ extension MessageMetricsDBQueryWhereDistinct
   }
 
   QueryBuilder<MessageMetricsDB, MessageMetricsDB, QDistinct>
+      distinctByClarificationRequestCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'clarificationRequestCount');
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, MessageMetricsDB, QDistinct>
       distinctByErrorCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'errorCount');
@@ -2366,6 +2466,13 @@ extension MessageMetricsDBQueryProperty
       avgWordLengthProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'avgWordLength');
+    });
+  }
+
+  QueryBuilder<MessageMetricsDB, int, QQueryOperations>
+      clarificationRequestCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'clarificationRequestCount');
     });
   }
 

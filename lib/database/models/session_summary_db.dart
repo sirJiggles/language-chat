@@ -23,6 +23,7 @@ class SessionSummaryDB {
   late double avgMessageLength;
   late int totalErrors;
   late double errorRate;  // errors per message
+  late int totalClarificationRequests;  // How often user needed clarification
   
   // Progress indicators
   late List<String> topicsDiscussed;

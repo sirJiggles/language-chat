@@ -8,6 +8,7 @@ import '../services/chat_service.dart';
 import '../services/context_manager.dart';
 import '../services/whisper_speech_service.dart';
 import '../services/tts_service.dart';
+import '../services/comprehensive_assessment_service.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_drawer.dart';
 import '../widgets/chat_input_bar.dart';
@@ -323,7 +324,29 @@ class ChatScreenState extends State<ChatScreen> {
                       }
 
                       final message = visibleMessages[index];
-                      return ChatBubble(message: message.content, isUser: message.isUser);
+                      final chatService = Provider.of<ChatService>(context, listen: false);
+                      
+                      // Get recent messages for context (last 5 messages before this one)
+                      final startIndex = (index - 5).clamp(0, index);
+                      final recentMessages = visibleMessages
+                          .sublist(startIndex, index)
+                          .map((m) => m.toString())
+                          .toList();
+                      
+                      return ChatBubble(
+                        message: message.content,
+                        isUser: message.isUser,
+                        targetLanguage: chatService.targetLanguage,
+                        recentMessages: recentMessages.isNotEmpty ? recentMessages : null,
+                        onClarificationRequested: message.isUser 
+                          ? null 
+                          : () {
+                              // Track clarification request for bot messages
+                              final assessmentService = Provider.of<ComprehensiveAssessmentService>(context, listen: false);
+                              final sessionId = assessmentService.currentSessionId;
+                              assessmentService.incrementClarificationCount(sessionId);
+                            },
+                      );
                     },
                   );
                 } else {
