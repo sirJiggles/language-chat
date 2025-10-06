@@ -18,12 +18,14 @@ class WhisperSpeechService extends ChangeNotifier {
   String _error = '';
   String _localeId = 'en';
   String? _currentRecordingPath;
+  double _currentAmplitude = 0.0;
 
   bool get isListening => _isRecording;
   bool get isTranscribing => _isTranscribing;
   String get lastWords => _lastWords;
   String get error => _error;
   String get localeId => _localeId;
+  double get currentAmplitude => _currentAmplitude;
 
   WhisperSpeechService({required String apiKey}) : _apiKey = apiKey;
 
@@ -49,6 +51,7 @@ class WhisperSpeechService extends ChangeNotifier {
     try {
       _lastWords = '';
       _error = '';
+      _currentAmplitude = 0.0;
       
       // Check permission again before recording
       if (!await _recorder.hasPermission()) {
@@ -74,12 +77,36 @@ class WhisperSpeechService extends ChangeNotifier {
 
       _isRecording = true;
       debugPrint('WhisperSpeechService: Started recording to $_currentRecordingPath');
+      
+      // Start monitoring amplitude
+      _monitorAmplitude();
+      
       notifyListeners();
     } catch (e) {
       debugPrint('WhisperSpeechService: Error starting recording: $e');
       _error = 'Failed to start recording: $e';
       _isRecording = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _monitorAmplitude() async {
+    while (_isRecording) {
+      try {
+        final amplitude = await _recorder.getAmplitude();
+        // Normalize amplitude (usually between -50 and 0 dB)
+        // Convert to 0.0 - 1.0 range
+        final normalized = ((amplitude.current + 50) / 50).clamp(0.0, 1.0);
+        
+        if (_currentAmplitude != normalized) {
+          _currentAmplitude = normalized;
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('WhisperSpeechService: Error getting amplitude: $e');
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
@@ -93,6 +120,7 @@ class WhisperSpeechService extends ChangeNotifier {
       // Stop recording
       final path = await _recorder.stop();
       _isRecording = false;
+      _currentAmplitude = 0.0;
       
       // If skipping transcription (cancelled), don't process
       if (skipTranscription) {

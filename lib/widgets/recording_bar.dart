@@ -15,24 +15,6 @@ class RecordingBar extends StatefulWidget {
 }
 
 class _RecordingBarState extends State<RecordingBar> {
-  double _audioLevel = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    // Simulate audio levels (in a real app, you'd get this from the speech service)
-    _simulateAudioLevels();
-  }
-
-  void _simulateAudioLevels() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      setState(() {
-        _audioLevel = 0.4 + (0.4 * (DateTime.now().millisecond / 1000));
-      });
-      _simulateAudioLevels();
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +36,14 @@ class _RecordingBarState extends State<RecordingBar> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: AudioWaveform(
-                  audioLevel: _audioLevel,
-                  color: Theme.of(context).colorScheme.primary,
-                  barCount: 25,
+                child: Consumer<WhisperSpeechService>(
+                  builder: (context, speechService, _) {
+                    return AudioWaveform(
+                      audioLevel: speechService.currentAmplitude,
+                      color: Theme.of(context).colorScheme.primary,
+                      barCount: 25,
+                    );
+                  },
                 ),
               ),
 
