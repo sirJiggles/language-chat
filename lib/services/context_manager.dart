@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/student_profile_store.dart';
 import '../models/language_level_tracker.dart';
+import '../database/repositories/error_pattern_repository.dart';
+import '../database/repositories/vocabulary_progress_repository.dart';
+import '../database/repositories/session_summary_repository.dart';
 
 /// Manages context and prompts for language learning conversations
 /// Uses StudentProfileStore and LanguageLevelTracker for all data - no file I/O
@@ -8,6 +11,11 @@ class ContextManager extends ChangeNotifier {
   StudentProfileStore? _profileStore;
   LanguageLevelTracker? _levelTracker;
   bool _isInitialized = false;
+  
+  // Repositories for data access
+  final _errorRepo = ErrorPatternRepository();
+  final _vocabRepo = VocabularyProgressRepository();
+  final _sessionRepo = SessionSummaryRepository();
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -34,7 +42,7 @@ class ContextManager extends ChangeNotifier {
 
 
   // Get context for the prompt
-  String getContextForPrompt() {
+  Future<String> getContextForPrompt() async {
     final contextBuilder = StringBuffer();
 
     // Check if we have basic information about the student
@@ -112,6 +120,54 @@ class ContextManager extends ChangeNotifier {
         }
         contextBuilder.writeln();
       }
+    }
+    
+    // Add error patterns if available
+    final recentErrors = await _errorRepo.getRecentErrors(5);
+    if (recentErrors.isNotEmpty) {
+      contextBuilder.writeln('=== COMMON MISTAKES TO ADDRESS ===');
+      final errorTypes = <String, int>{};
+      for (final error in recentErrors) {
+        errorTypes[error.errorType] = (errorTypes[error.errorType] ?? 0) + 1;
+      }
+      
+      contextBuilder.writeln('The student frequently makes these errors:');
+      for (final entry in errorTypes.entries) {
+        contextBuilder.writeln('- ${entry.key} (${entry.value}x)');
+      }
+      contextBuilder.writeln('Gently correct these in your responses and provide examples.');
+      contextBuilder.writeln();
+    }
+    
+    // Add vocabulary progress if available
+    final vocabCount = await _vocabRepo.getCount();
+    final masteredCount = await _vocabRepo.getMasteredCount();
+    if (vocabCount > 0) {
+      contextBuilder.writeln('=== VOCABULARY TRACKING ===');
+      contextBuilder.writeln('Student has used $vocabCount unique words');
+      contextBuilder.writeln('Mastered: $masteredCount words');
+      contextBuilder.writeln('Use words they know, but introduce new ones gradually.');
+      contextBuilder.writeln();
+    }
+    
+    // Add clarification usage if available
+    final activeSession = await _sessionRepo.getActiveSession();
+    if (activeSession != null && activeSession.totalClarificationRequests > 0) {
+      final clarificationRate = activeSession.totalMessages > 0 
+          ? (activeSession.totalClarificationRequests / activeSession.totalMessages * 100).toStringAsFixed(1)
+          : '0';
+      
+      contextBuilder.writeln('=== COMPREHENSION FEEDBACK ===');
+      contextBuilder.writeln('Student requested clarification $clarificationRate% of the time');
+      
+      if (activeSession.totalClarificationRequests > activeSession.totalMessages * 0.3) {
+        contextBuilder.writeln('⚠️ HIGH CLARIFICATION RATE - Simplify your language significantly!');
+        contextBuilder.writeln('Use shorter sentences, basic vocabulary, and speak more slowly.');
+      } else if (activeSession.totalClarificationRequests > activeSession.totalMessages * 0.15) {
+        contextBuilder.writeln('⚠️ MODERATE CLARIFICATION RATE - Content may be slightly too difficult.');
+        contextBuilder.writeln('Simplify slightly and check understanding more often.');
+      }
+      contextBuilder.writeln();
     }
 
     return contextBuilder.toString();

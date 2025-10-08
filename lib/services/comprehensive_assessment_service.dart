@@ -10,6 +10,8 @@ import '../database/repositories/assessment_repository.dart';
 import '../database/models/message_metrics_db.dart';
 import '../database/models/session_summary_db.dart';
 import '../database/models/assessment_db.dart';
+import '../database/models/vocabulary_progress_db.dart';
+import '../database/models/error_pattern_db.dart';
 import '../models/student_profile_store.dart';
 import '../models/language_level_tracker.dart';
 
@@ -106,16 +108,57 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
     // Collect basic metrics (lightweight, no AI call)
     await _collectMessageMetrics(sessionId, userMessage);
     
+    // Track vocabulary from user message
+    await _trackVocabulary(sessionId, userMessage, targetLanguage);
+    
     // Update session summary
     await _updateSessionSummary(sessionId);
     
     // Check if it's time for comprehensive assessment
     if (_shouldPerformComprehensiveAssessment()) {
       debugPrint('Triggering comprehensive assessment at $_messageCountInSession messages');
-      await _performComprehensiveAssessment(targetLanguage);
+      await _performComprehensiveAssessment(targetLanguage, userMessage, assistantMessage);
     }
     
     notifyListeners();
+  }
+  
+  /// Track vocabulary usage (lightweight, no AI call)
+  Future<void> _trackVocabulary(String sessionId, String userMessage, String targetLanguage) async {
+    final words = userMessage.split(RegExp(r'\s+'))
+        .map((w) => w.toLowerCase().replaceAll(RegExp(r'[^a-zäöüß]'), ''))
+        .where((w) => w.length > 2) // Skip very short words
+        .toSet();
+    
+    for (final word in words) {
+      try {
+        // Check if word already exists
+        final existing = await _vocabRepo.getVocabularyByWord(word);
+        
+        if (existing != null) {
+          // Update existing entry
+          existing.lastUsed = DateTime.now();
+          existing.usageCount += 1;
+          await _vocabRepo.saveVocabulary(existing);
+        } else {
+          // Create new entry
+          final vocab = VocabularyProgressDB()
+            ..word = word
+            ..level = _levelTracker.currentLevel
+            ..firstUsed = DateTime.now()
+            ..lastUsed = DateTime.now()
+            ..usageCount = 1
+            ..correctUsageCount = 0
+            ..incorrectUsageCount = 0
+            ..mastered = false
+            ..contextExamples = [userMessage];
+          
+          await _vocabRepo.saveVocabulary(vocab);
+        }
+      } catch (e) {
+        debugPrint('Error tracking vocabulary word "$word": $e');
+      }
+    }
   }
   
   /// Collect lightweight metrics for a message (no AI call)
@@ -233,9 +276,12 @@ class ComprehensiveAssessmentService extends ChangeNotifier {
   }
   
   /// Perform comprehensive AI-based assessment (expensive, infrequent)
-  Future<void> _performComprehensiveAssessment(String targetLanguage) async {
+  Future<void> _performComprehensiveAssessment(String targetLanguage, String userMessage, String assistantMessage) async {
     debugPrint('Starting comprehensive assessment...');
     _lastComprehensiveAssessment = DateTime.now();
+    
+    // Analyze recent message for errors
+    await _analyzeForErrors(userMessage, assistantMessage, targetLanguage);
     
     // Gather all relevant data
     final recentMetrics = await _metricsRepo.getRecentMetrics(20);
@@ -451,6 +497,85 @@ AREAS_FOR_IMPROVEMENT: [key areas to work on]''';
     final index2 = levels.indexOf(level2);
     if (index1 == -1 || index2 == -1) return 0;
     return index2 - index1;
+  }
+  
+  /// Analyze user message for errors using AI
+  Future<void> _analyzeForErrors(String userMessage, String assistantMessage, String targetLanguage) async {
+    final sessionId = _currentSessionId ?? '';
+    
+    final prompt = '''Analyze this $targetLanguage message for errors:
+
+User: "$userMessage"
+Assistant's response: "$assistantMessage"
+
+Identify any grammar, vocabulary, or syntax errors in the user's message. If the assistant corrected something, that indicates an error.
+
+Return ONLY JSON array of errors in this format:
+[
+  {
+    "errorType": "verb_conjugation|word_order|article_usage|preposition|etc",
+    "category": "grammar|vocabulary|syntax",
+    "context": "the sentence with the error",
+    "correction": "how it should be corrected"
+  }
+]
+
+If no errors, return: []''';
+    
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': 'gpt-4o-mini',
+          'messages': [
+            {'role': 'system', 'content': 'You are a language error analysis expert. Be precise and only identify actual errors.'},
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.2,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] ?? '';
+        
+        // Extract JSON array
+        final jsonMatch = RegExp(r'\[[\s\S]*\]').firstMatch(content);
+        if (jsonMatch != null) {
+          final jsonStr = jsonMatch.group(0)!;
+          final errors = jsonDecode(jsonStr) as List;
+          
+          if (errors.isNotEmpty) {
+            debugPrint('Detected ${errors.length} errors');
+            
+            for (final error in errors) {
+              final errorMap = error as Map<String, dynamic>;
+              
+              // Check if this error type has occurred before
+              final existingErrors = await _errorRepo.getErrorsByType(errorMap['errorType']);
+              
+              final errorDB = ErrorPatternDB()
+                ..timestamp = DateTime.now()
+                ..errorType = errorMap['errorType']
+                ..context = errorMap['context']
+                ..correction = errorMap['correction']
+                ..category = errorMap['category']
+                ..recurring = existingErrors.isNotEmpty
+                ..occurrenceCount = existingErrors.length + 1
+                ..sessionId = sessionId;
+              
+              await _errorRepo.saveError(errorDB);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error analyzing for errors: $e');
+    }
   }
   
   /// Extract facts using AI (separate call, still useful)

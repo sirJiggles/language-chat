@@ -3,13 +3,13 @@ import 'dart:math' as math;
 
 class AudioWaveform extends StatefulWidget {
   final double audioLevel; // 0.0 to 1.0
-  final Color color;
+  final Color? color;
   final int barCount;
   
   const AudioWaveform({
     super.key,
     required this.audioLevel,
-    this.color = Colors.blue,
+    this.color,
     this.barCount = 40,
   });
 
@@ -67,6 +67,8 @@ class _AudioWaveformState extends State<AudioWaveform> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    
     return ClipRect(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -83,7 +85,7 @@ class _AudioWaveformState extends State<AudioWaveform> with SingleTickerProvider
                 height: constraints.maxHeight * _barHeights[index],
                 margin: EdgeInsets.symmetric(horizontal: spacing),
                 decoration: BoxDecoration(
-                  color: widget.color,
+                  color: color,
                   borderRadius: BorderRadius.circular(barWidth / 2),
                 ),
               );

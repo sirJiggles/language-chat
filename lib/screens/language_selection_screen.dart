@@ -15,6 +15,7 @@ class LanguageSelectionScreen extends StatefulWidget {
 class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   String? _nativeLanguage;
   String? _targetLanguage;
+  final ScrollController _scrollController = ScrollController();
 
   // Common languages for learning
   final List<Map<String, String>> _languages = [
@@ -54,6 +55,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
               // Scrollable content
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
@@ -107,6 +109,16 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                               // Clear target if same as native
                               if (_targetLanguage == code) {
                                 _targetLanguage = null;
+                              }
+                            });
+                            // Auto-scroll to "I want to learn" section
+                            Future.delayed(const Duration(milliseconds: 300), () {
+                              if (_scrollController.hasClients) {
+                                _scrollController.animateTo(
+                                  _scrollController.position.maxScrollExtent,
+                                  duration: const Duration(milliseconds: 500),
+                                  curve: Curves.easeInOut,
+                                );
                               }
                             });
                           },
@@ -167,6 +179,12 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Widget _buildLanguageGrid({

@@ -14,8 +14,8 @@ class ChatBubble extends StatelessWidget {
   final List<String>? recentMessages; // For context in clarification
 
   const ChatBubble({
-    super.key, 
-    required this.message, 
+    super.key,
+    required this.message,
     required this.isUser,
     this.targetLanguage,
     this.onClarificationRequested,
@@ -56,6 +56,7 @@ class ChatBubble extends StatelessWidget {
                       );
                     },
                   ),
+
             // Add control buttons for bot messages only
             if (!isUser)
               Consumer3<TtsService, SettingsModel, ClarificationService>(
@@ -68,117 +69,106 @@ class ChatBubble extends StatelessWidget {
                         message.substring(0, message.length > 50 ? 50 : message.length),
                       );
 
-                  return Align(
-                    alignment: Alignment.bottomRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Question mark button for clarification (only if callback provided)
-                        if (onClarificationRequested != null)
-                          IconButton(
-                            icon: Icon(
-                              Icons.help_outline,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
-                            ),
-                            constraints: const BoxConstraints(maxHeight: 20, maxWidth: 20),
-                            padding: EdgeInsets.zero,
-                            iconSize: 20,
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () async {
-                              debugPrint('ChatBubble: Requesting clarification');
-                              
-                              // Notify parent that clarification was requested (for metrics)
-                              onClarificationRequested?.call();
-                              
-                              // Show loading dialog
-                              if (!context.mounted) return;
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (ctx) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              );
-                              
-                              try {
-                                final clarification = await clarificationService.getClarification(
-                                  message: message,
-                                  targetLanguage: targetLanguage ?? 'German',
-                                  nativeLanguage: settings.nativeLanguage,
-                                  recentMessages: recentMessages,
-                                );
-                                
-                                // Close loading dialog
-                                if (!context.mounted) return;
-                                Navigator.of(context).pop();
-                                
-                                // Show clarification dialog
+                  return Column(
+                    children: [
+                      SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Question mark button for clarification (only if callback provided) - on the left
+                          if (onClarificationRequested != null)
+                            InkWell(
+                              onTap: () async {
+                                debugPrint('ChatBubble: Requesting clarification');
+
+                                // Notify parent that clarification was requested (for metrics)
+                                onClarificationRequested?.call();
+
+                                // Show loading dialog
                                 if (!context.mounted) return;
                                 showDialog(
                                   context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Translation'),
-                                    content: SingleChildScrollView(
-                                      child: Text(clarification),
+                                  barrierDismissible: false,
+                                  builder: (ctx) =>
+                                      const Center(child: CircularProgressIndicator()),
+                                );
+
+                                try {
+                                  final clarification = await clarificationService.getClarification(
+                                    message: message,
+                                    targetLanguage: targetLanguage ?? 'German',
+                                    nativeLanguage: settings.nativeLanguage,
+                                    recentMessages: recentMessages,
+                                  );
+
+                                  // Close loading dialog
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pop();
+
+                                  // Show clarification dialog
+                                  if (!context.mounted) return;
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Translation'),
+                                      content: SingleChildScrollView(child: Text(clarification)),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          child: const Text('Close'),
+                                        ),
+                                      ],
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
-                                        child: const Text('Close'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } catch (e) {
-                                // Close loading dialog
-                                if (!context.mounted) return;
-                                Navigator.of(context).pop();
-                                
-                                // Show error
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error: $e')),
-                                );
-                              }
-                            },
-                          ),
-                        // Audio button (if audio is enabled)
-                        if (settings.audioEnabled)
-                          IconButton(
-                            icon: Icon(
-                              isThisMessagePlaying
-                                  ? Icons.stop
-                                  : Icons.volume_up,
-                              size: 20,
-                              color: isThisMessagePlaying
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                                  );
+                                } catch (e) {
+                                  // Close loading dialog
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pop();
+
+                                  // Show error
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                }
+                              },
+                              child: Icon(
+                                Icons.help_outline,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                              ),
                             ),
-                            constraints: const BoxConstraints(maxHeight: 20, maxWidth: 20),
-                            padding: EdgeInsets.zero,
-                            iconSize: 20,
-                            visualDensity: VisualDensity.compact,
-                            onPressed: isThisMessagePlaying
-                                ? () {
-                                    debugPrint('ChatBubble: Stopping TTS');
-                                    ttsService.stop();
-                                  }
-                                : () async {
-                                    final messageText = message;
-                                    debugPrint('ChatBubble: Playing audio for message');
-
-                                    if (ttsService.isSpeaking) {
-                                      await ttsService.stop();
-                                      await Future.delayed(const Duration(milliseconds: 100));
+                          // Audio button (if audio is enabled)
+                          if (settings.audioEnabled)
+                            InkWell(
+                              onTap: isThisMessagePlaying
+                                  ? () {
+                                      debugPrint('ChatBubble: Stopping TTS');
+                                      ttsService.stop();
                                     }
+                                  : () async {
+                                      final messageText = message;
+                                      debugPrint('ChatBubble: Playing audio for message');
 
-                                    await ttsService.speak(messageText);
-                                    debugPrint('ChatBubble: TTS speak method returned');
-                                  },
-                          ),
-                      ],
-                    ),
+                                      if (ttsService.isSpeaking) {
+                                        await ttsService.stop();
+                                        await Future.delayed(const Duration(milliseconds: 100));
+                                      }
+
+                                      await ttsService.speak(messageText);
+                                      debugPrint('ChatBubble: TTS speak method returned');
+                                    },
+                              child: Icon(
+                                isThisMessagePlaying ? Icons.stop : Icons.volume_up,
+                                size: 20,
+                                color: isThisMessagePlaying
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   );
                 },
               ),

@@ -134,7 +134,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                         hintText: isTranscribing ? 'Transcribing...' : 'Message',
                                         hintStyle: TextStyle(
                                           color: isTranscribing
-                                              ? Colors.blue.withOpacity(0.6)
+                                              ? Theme.of(context).colorScheme.primary.withOpacity(0.6)
                                               : Colors.black38,
                                           fontWeight: isTranscribing
                                               ? FontWeight.w500
@@ -216,9 +216,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: isTranscribing
-                                            ? Colors.blue
-                                            : Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(context).colorScheme.primary,
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(

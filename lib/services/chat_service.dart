@@ -79,7 +79,7 @@ class ChatService extends ChangeNotifier {
       // Prepare context for the conversation
       String context = '';
       if (_contextManager.isInitialized) {
-        context = _contextManager.getContextForPrompt();
+        context = await _contextManager.getContextForPrompt();
       }
 
       // Prepare the prompt
