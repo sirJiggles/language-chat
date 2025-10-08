@@ -19,6 +19,9 @@ class WhisperSpeechService extends ChangeNotifier {
   String _localeId = 'en';
   String? _currentRecordingPath;
   double _currentAmplitude = 0.0;
+  int _retryCount = 0;
+  String? _lastRecordingPath;
+  bool _hasRetryableError = false;
 
   bool get isListening => _isRecording;
   bool get isTranscribing => _isTranscribing;
@@ -26,6 +29,7 @@ class WhisperSpeechService extends ChangeNotifier {
   String get error => _error;
   String get localeId => _localeId;
   double get currentAmplitude => _currentAmplitude;
+  bool get hasRetryableError => _hasRetryableError;
 
   WhisperSpeechService({required String apiKey}) : _apiKey = apiKey;
 
@@ -52,6 +56,8 @@ class WhisperSpeechService extends ChangeNotifier {
       _lastWords = '';
       _error = '';
       _currentAmplitude = 0.0;
+      _retryCount = 0;
+      _hasRetryableError = false;
       
       // Check permission again before recording
       if (!await _recorder.hasPermission()) {
@@ -171,16 +177,11 @@ class WhisperSpeechService extends ChangeNotifier {
         return;
       }
 
+      // Save the recording path for potential retries
+      _lastRecordingPath = path;
+      
       // Send to Whisper API for transcription
       await _transcribeAudio(path);
-
-      // Clean up the recording file
-      try {
-        await file.delete();
-        debugPrint('WhisperSpeechService: Deleted recording file');
-      } catch (e) {
-        debugPrint('WhisperSpeechService: Error deleting recording file: $e');
-      }
     } catch (e) {
       debugPrint('WhisperSpeechService: Error stopping recording: $e');
       _error = 'Failed to stop recording: $e';
@@ -191,7 +192,7 @@ class WhisperSpeechService extends ChangeNotifier {
 
   Future<void> _transcribeAudio(String audioPath) async {
     try {
-      debugPrint('WhisperSpeechService: Transcribing audio with language: $_localeId');
+      debugPrint('WhisperSpeechService: Transcribing audio with language: $_localeId (attempt ${_retryCount + 1})');  
 
       final request = http.MultipartRequest(
         'POST',
@@ -223,27 +224,107 @@ class WhisperSpeechService extends ChangeNotifier {
         _lastWords = jsonResponse['text'] ?? '';
         debugPrint('WhisperSpeechService: Transcription: $_lastWords');
         _error = '';
+        _retryCount = 0;
+        _hasRetryableError = false;
+        
+        // Clean up the recording file on success
+        _cleanupRecording();
       } else {
         debugPrint('WhisperSpeechService: Error response: ${response.body}');
-        _error = 'Transcription failed: ${response.statusCode}';
         
-        // Try to parse error message
+        // Try to parse error details
+        String errorType = 'unknown';
+        String errorMessage = 'Transcription failed: ${response.statusCode}';
         try {
           final errorJson = json.decode(response.body);
-          if (errorJson['error'] != null && errorJson['error']['message'] != null) {
-            _error = errorJson['error']['message'];
+          if (errorJson['error'] != null) {
+            errorType = errorJson['error']['type'] ?? 'unknown';
+            errorMessage = errorJson['error']['message'] ?? errorMessage;
           }
         } catch (e) {
           // Use default error message
+        }
+        
+        // Check if this is a retryable error (server errors)
+        final isRetryable = errorType == 'server_error' || response.statusCode >= 500;
+        
+        if (isRetryable && _retryCount < 2) {
+          // Automatic retry
+          _retryCount++;
+          debugPrint('WhisperSpeechService: Retryable error detected, attempting retry $_retryCount/2');
+          
+          // Wait a bit before retrying
+          await Future.delayed(Duration(milliseconds: 500 * _retryCount));
+          
+          _isTranscribing = true;
+          notifyListeners();
+          
+          // Retry transcription
+          await _transcribeAudio(audioPath);
+          return;
+        } else if (isRetryable && _retryCount >= 2) {
+          // Max retries reached, show manual retry option
+          _hasRetryableError = true;
+          _error = 'Connection issue. Tap to retry.';
+          debugPrint('WhisperSpeechService: Max auto-retries reached, manual retry available');
+        } else {
+          // Non-retryable error
+          _error = errorMessage;
+          _cleanupRecording();
         }
       }
 
       notifyListeners();
     } catch (e) {
       debugPrint('WhisperSpeechService: Error transcribing audio: $e');
-      _error = 'Transcription error: $e';
-      _isTranscribing = false;
+      
+      if (_retryCount < 2) {
+        // Automatic retry on network errors
+        _retryCount++;
+        debugPrint('WhisperSpeechService: Network error, attempting retry $_retryCount/2');
+        
+        await Future.delayed(Duration(milliseconds: 500 * _retryCount));
+        
+        _isTranscribing = true;
+        notifyListeners();
+        
+        await _transcribeAudio(audioPath);
+        return;
+      } else {
+        // Max retries reached
+        _hasRetryableError = true;
+        _error = 'Connection issue. Tap to retry.';
+        _isTranscribing = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _cleanupRecording() async {
+    if (_lastRecordingPath != null) {
+      try {
+        final file = File(_lastRecordingPath!);
+        if (await file.exists()) {
+          await file.delete();
+          debugPrint('WhisperSpeechService: Deleted recording file');
+        }
+        _lastRecordingPath = null;
+      } catch (e) {
+        debugPrint('WhisperSpeechService: Error deleting recording file: $e');
+      }
+    }
+  }
+  
+  Future<void> retryTranscription() async {
+    if (_lastRecordingPath != null && _hasRetryableError) {
+      debugPrint('WhisperSpeechService: Manual retry requested');
+      _retryCount = 0;
+      _hasRetryableError = false;
+      _error = '';
+      _isTranscribing = true;
       notifyListeners();
+      
+      await _transcribeAudio(_lastRecordingPath!);
     }
   }
 

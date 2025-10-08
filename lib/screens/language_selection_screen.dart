@@ -212,12 +212,12 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Theme.of(context).colorScheme.primaryContainer
-                      : Theme.of(context).colorScheme.secondaryContainer,
+                      : Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.secondaryContainer,
+                        : Theme.of(context).colorScheme.surface,
                     width: isSelected ? 2 : 1,
                   ),
                   boxShadow: [

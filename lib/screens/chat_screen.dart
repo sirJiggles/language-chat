@@ -224,13 +224,28 @@ class ChatScreenState extends State<ChatScreen> {
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: ClipRRect(
-          child: BackdropFilter(
-            // we only want to blur the app bar if we are in dark mode
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: AppBar(
-              backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-              elevation: 0,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: AppBar(
+                backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                elevation: 0,
               leading: Builder(
                 builder: (context) => IconButton(
                   icon: const Icon(Icons.menu),
@@ -267,6 +282,7 @@ class ChatScreenState extends State<ChatScreen> {
                   ],
                 ),
               ],
+              ),
             ),
           ),
         ),

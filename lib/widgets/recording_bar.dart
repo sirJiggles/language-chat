@@ -17,12 +17,28 @@ class RecordingBar extends StatefulWidget {
 class _RecordingBarState extends State<RecordingBar> {
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-          padding: EdgeInsets.fromLTRB(10, 8.0, 8.0, 8.0),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+            padding: EdgeInsets.fromLTRB(10, 8.0, 8.0, 8.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -128,6 +144,7 @@ class _RecordingBarState extends State<RecordingBar> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -17,7 +17,7 @@ class SettingsModel extends ChangeNotifier {
   String _openaiTtsVoice = 'nova'; // Default OpenAI voice
   String _nativeLanguage = 'English'; // Default native language
   bool _audioEnabled = true; // Default audio on
-  bool _isDarkMode = true; // Default dark mode on
+  bool _isDarkMode = false; // Default light mode on
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
@@ -61,7 +61,7 @@ class SettingsModel extends ChangeNotifier {
     _audioEnabled = prefs.getBool(_audioEnabledKey) ?? true;
     
     // Load dark mode
-    _isDarkMode = prefs.getBool(_darkModeKey) ?? true;
+    _isDarkMode = prefs.getBool(_darkModeKey) ?? false;
     
     notifyListeners();
   }

@@ -225,188 +225,216 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
           return RecordingBar(onCancel: _handleRecordingCancel, onConfirm: _handleRecordingConfirm);
         }
 
-        return ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-              padding: EdgeInsets.fromLTRB(8.0, 15, 8.0, 15),
-              child: Builder(
-                builder: (context) {
-                  // Update text field when transcription completes
-                  if (speechService.lastWords.isNotEmpty &&
-                      speechService.lastWords != _lastTranscription) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      widget.textController.text = speechService.lastWords;
-                      _lastTranscription = speechService.lastWords;
+        return Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                padding: EdgeInsets.fromLTRB(8.0, 15, 8.0, 15),
+                child: Builder(
+                  builder: (context) {
+                    // Update text field when transcription completes
+                    if (speechService.lastWords.isNotEmpty &&
+                        speechService.lastWords != _lastTranscription) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        widget.textController.text = speechService.lastWords;
+                        _lastTranscription = speechService.lastWords;
 
-                      // Speculatively send the message (optimistic execution)
-                      debugPrint(
-                        'ChatInputBar: Transcription complete, starting speculative request',
-                      );
-                      _startSpeculativeRequest(speechService.lastWords);
-                    });
-                  }
+                        // Speculatively send the message (optimistic execution)
+                        debugPrint(
+                          'ChatInputBar: Transcription complete, starting speculative request',
+                        );
+                        _startSpeculativeRequest(speechService.lastWords);
+                      });
+                    }
 
-                  // Clear the last transcription when listening starts
-                  if (isListening && _lastTranscription.isNotEmpty) {
-                    _lastTranscription = '';
-                    // Reset speculative request state when starting new recording
-                    _speculativeRequestActive = false;
-                    _speculativeResponse = null;
-                    _speculativeAudioReady = false;
-                  }
+                    // Clear the last transcription when listening starts
+                    if (isListening && _lastTranscription.isNotEmpty) {
+                      _lastTranscription = '';
+                      // Reset speculative request state when starting new recording
+                      _speculativeRequestActive = false;
+                      _speculativeResponse = null;
+                      _speculativeAudioReady = false;
+                    }
 
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      // Text input field
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: AnimatedBuilder(
-                                  animation: _pulseAnimation,
-                                  builder: (context, child) {
-                                    return TextField(
-                                      controller: widget.textController,
-                                      style: const TextStyle(color: Colors.black87),
-                                      decoration: InputDecoration(
-                                        hintText: isTranscribing ? 'Transcribing...' : 'Message',
-                                        hintStyle: TextStyle(
-                                          color: isTranscribing
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary.withOpacity(0.6)
-                                              : Colors.black38,
-                                          fontWeight: isTranscribing
-                                              ? FontWeight.w500
-                                              : FontWeight.normal,
-                                        ),
-                                        border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 20,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      maxLines: null,
-                                      textInputAction: TextInputAction.send,
-                                      onSubmitted: (_) => _handleSendWithSpeculation(),
-                                    );
-                                  },
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Text input field
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
-                              ),
-                              // Clear button
-                              ValueListenableBuilder<TextEditingValue>(
-                                valueListenable: widget.textController,
-                                builder: (context, value, child) {
-                                  if (value.text.isEmpty) return const SizedBox.shrink();
-                                  return IconButton(
-                                    icon: const Icon(Icons.clear, size: 20),
-                                    color: Colors.black54,
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: AnimatedBuilder(
+                                    animation: _pulseAnimation,
+                                    builder: (context, child) {
+                                      return TextField(
+                                        controller: widget.textController,
+                                        style: const TextStyle(color: Colors.black87),
+                                        decoration: InputDecoration(
+                                          hintText: isTranscribing ? 'Transcribing...' : 'Message',
+                                          hintStyle: TextStyle(
+                                            color: isTranscribing
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary.withOpacity(0.6)
+                                                : Colors.black38,
+                                            fontWeight: isTranscribing
+                                                ? FontWeight.w500
+                                                : FontWeight.normal,
+                                          ),
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 20,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        maxLines: null,
+                                        textInputAction: TextInputAction.send,
+                                        onSubmitted: (_) => _handleSendWithSpeculation(),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                // Retry button for transcription errors
+                                if (speechService.hasRetryableError)
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, size: 20),
+                                    color: Theme.of(context).colorScheme.error,
+                                    tooltip: 'Retry transcription',
                                     onPressed: () {
-                                      widget.textController.clear();
-                                      // Cancel any speculative request
-                                      _speculativeRequestActive = false;
-                                      _speculativeResponse = null;
-                                      _speculativeAudioReady = false;
-                                      _lastTranscription = '';
+                                      speechService.retryTranscription();
                                     },
                                     padding: const EdgeInsets.all(8),
                                     constraints: const BoxConstraints(),
-                                  );
-                                },
-                              ),
-                            ],
+                                  ),
+                                // Clear button
+                                ValueListenableBuilder<TextEditingValue>(
+                                  valueListenable: widget.textController,
+                                  builder: (context, value, child) {
+                                    if (value.text.isEmpty) return const SizedBox.shrink();
+                                    return IconButton(
+                                      icon: const Icon(Icons.clear, size: 20),
+                                      color: Colors.black54,
+                                      onPressed: () {
+                                        widget.textController.clear();
+                                        // Cancel any speculative request
+                                        _speculativeRequestActive = false;
+                                        _speculativeResponse = null;
+                                        _speculativeAudioReady = false;
+                                        _lastTranscription = '';
+                                      },
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Mic/Send button
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: widget.textController,
-                        builder: (context, value, child) {
-                          final hasText = value.text.trim().isNotEmpty;
+                        // Mic/Send button
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: widget.textController,
+                          builder: (context, value, child) {
+                            final hasText = value.text.trim().isNotEmpty;
 
-                          // Show send button when there's text
-                          // Show mic when empty
-                          return SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: (hasText && !isTranscribing)
-                                ? IconButton(
-                                    onPressed: _handleSendWithSpeculation,
-                                    icon: Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Icon(
-                                        Icons.send,
-                                        color: Theme.of(context).colorScheme.onPrimary,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                  )
-                                : GestureDetector(
-                                    onTap: _handleMicTap,
-                                    child: Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      child: isTranscribing
-                                          ? Padding(
-                                              padding: const EdgeInsets.all(12.0),
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : Icon(
-                                              Icons.mic,
-                                              color: Theme.of(context).colorScheme.onPrimary,
-                                              size: 24,
+                            // Show send button when there's text
+                            // Show mic when empty
+                            return SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: (hasText && !isTranscribing)
+                                  ? IconButton(
+                                      onPressed: _handleSendWithSpeculation,
+                                      icon: Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.2),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
                                             ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          Icons.send,
+                                          color: Theme.of(context).colorScheme.onPrimary,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                    )
+                                  : GestureDetector(
+                                      onTap: _handleMicTap,
+                                      child: Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.2),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: isTranscribing
+                                            ? Padding(
+                                                padding: const EdgeInsets.all(12.0),
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.mic,
+                                                color: Theme.of(context).colorScheme.onPrimary,
+                                                size: 24,
+                                              ),
+                                      ),
                                     ),
-                                  ),
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
