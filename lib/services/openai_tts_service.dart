@@ -61,6 +61,35 @@ class OpenAITtsService {
     }
   }
 
+  /// Generate audio without playing it (for pre-generation/caching)
+  /// Returns the audio data if successful, null otherwise
+  Future<Uint8List?> generateAudio(String text) async {
+    debugPrint('OpenAI TTS: generateAudio method called with text length ${text.length}');
+    if (text.isEmpty) {
+      debugPrint('OpenAI TTS: Empty text, nothing to generate');
+      return null;
+    }
+    
+    if (_apiKey.isEmpty) {
+      debugPrint('OpenAI TTS: No API key provided');
+      throw Exception('OpenAI API key is not configured');
+    }
+
+    try {
+      debugPrint('OpenAI TTS: Generating audio data (without playing)');
+      final audioData = await _generateSpeech(text);
+      if (audioData != null) {
+        debugPrint('OpenAI TTS: Audio data generated successfully (${audioData.length} bytes)');
+        return audioData;
+      } else {
+        debugPrint('OpenAI TTS: No audio data generated');
+      }
+    } catch (e) {
+      debugPrint('Error in OpenAI TTS generateAudio: $e');
+    }
+    return null;
+  }
+
   /// Generate and play speech from text
   /// Returns the audio data if successful, null otherwise
   Future<Uint8List?> speak(String text) async {

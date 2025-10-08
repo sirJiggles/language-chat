@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/whisper_speech_service.dart';
 import '../services/chat_service.dart';
+import '../services/tts_service.dart';
+import '../models/settings_model.dart';
 import 'recording_bar.dart';
 
 class ChatInputBar extends StatefulWidget {
@@ -25,6 +27,9 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   String _lastTranscription = '';
+  Future<String>? _speculativeResponse;
+  bool _speculativeRequestActive = false;
+  bool _speculativeAudioReady = false;
 
   @override
   void initState() {
@@ -60,6 +65,11 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
   Future<void> _handleRecordingCancel() async {
     final speechService = Provider.of<WhisperSpeechService>(context, listen: false);
 
+    // Cancel speculative request if active
+    _speculativeRequestActive = false;
+    _speculativeResponse = null;
+    _speculativeAudioReady = false;
+
     await speechService.stopListening(skipTranscription: true);
     speechService.clearLastWords();
   }
@@ -68,6 +78,143 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
     final speechService = Provider.of<WhisperSpeechService>(context, listen: false);
 
     await speechService.stopListening(skipTranscription: false);
+    // Transcription will complete and text will appear in the text field
+    // The speculative request will start automatically when transcription finishes
+  }
+  
+  void _startSpeculativeRequest(String text) async {
+    if (text.trim().isEmpty) return;
+    
+    debugPrint('ChatInputBar: Starting speculative request for: $text');
+    _speculativeRequestActive = true;
+    _speculativeAudioReady = false;
+    
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    final settings = Provider.of<SettingsModel>(context, listen: false);
+    
+    // Use the speculative method that doesn't update UI
+    _speculativeResponse = chatService.fetchResponseSpeculatively(text);
+    
+    // Also speculatively generate audio if enabled
+    if (settings.audioEnabled) {
+      try {
+        final response = await _speculativeResponse!;
+        if (!mounted || !_speculativeRequestActive) return;
+        
+        debugPrint('ChatInputBar: Speculative response received, pre-generating audio');
+        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
+        
+        if (cleanResponse.isNotEmpty) {
+          // Pre-generate audio (but don't play it yet)
+          await ttsService.preGenerateAudio(cleanResponse);
+          if (mounted && _speculativeRequestActive) {
+            _speculativeAudioReady = true;
+            debugPrint('ChatInputBar: Speculative audio ready!');
+          }
+        }
+      } catch (e) {
+        debugPrint('ChatInputBar: Error pre-generating audio: $e');
+      }
+    }
+  }
+  
+  Future<void> _handleSendWithSpeculation() async {
+    // Get the message text before clearing
+    final messageText = widget.textController.text.trim();
+    
+    // Always clear the text field immediately
+    widget.textController.clear();
+    
+    // Clear speech service lastWords to prevent re-population
+    final speechService = Provider.of<WhisperSpeechService>(context, listen: false);
+    speechService.clearLastWords();
+    
+    if (_speculativeRequestActive && 
+        _speculativeResponse != null && 
+        messageText == _lastTranscription &&
+        messageText.isNotEmpty) {
+      
+      debugPrint('ChatInputBar: Sending with speculative response');
+      
+      try {
+        
+        // Wait for the speculative response (might already be ready)
+        final cachedResponse = await _speculativeResponse!;
+        _speculativeRequestActive = false;
+        _speculativeResponse = null;
+        _lastTranscription = '';
+        
+        if (!mounted) return;
+        
+        debugPrint('ChatInputBar: Speculative response received, using it');
+        
+        // Send message with cached response
+        final chatService = Provider.of<ChatService>(context, listen: false);
+        final ttsService = Provider.of<TtsService>(context, listen: false);
+        final settings = Provider.of<SettingsModel>(context, listen: false);
+        
+        await chatService.sendMessage(messageText, cachedResponse: cachedResponse);
+        
+        // Reveal immediately since we have the response ready
+        chatService.revealBotMessage();
+        
+        // Start audio playback in background (don't wait)
+        if (settings.audioEnabled) {
+          final cleanResponse = cachedResponse.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
+          if (cleanResponse.isNotEmpty) {
+            if (_speculativeAudioReady) {
+              debugPrint('ChatInputBar: Using pre-generated audio - instant playback!');
+            }
+            // Fire and forget - audio plays in background
+            ttsService.speak(cleanResponse).catchError((e) {
+              debugPrint('ChatInputBar: Error speaking response: $e');
+            });
+          }
+        }
+        
+        _speculativeAudioReady = false;
+        widget.onScrollToBottom();
+        return;
+      } catch (e) {
+        debugPrint('ChatInputBar: Error with speculative response: $e');
+        // Fall through to normal send
+      }
+    }
+    
+    // Reset speculative state and send normally (without cached response)
+    _speculativeRequestActive = false;
+    _speculativeResponse = null;
+    _speculativeAudioReady = false;
+    _lastTranscription = '';
+    
+    if (messageText.isEmpty) return;
+    
+    // Send message normally
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    final ttsService = Provider.of<TtsService>(context, listen: false);
+    final settings = Provider.of<SettingsModel>(context, listen: false);
+    
+    final response = await chatService.sendMessage(messageText);
+    
+    // Handle TTS and reveal
+    if (settings.audioEnabled) {
+      try {
+        final cleanResponse = response.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
+        if (cleanResponse.isNotEmpty) {
+          ttsService.speak(cleanResponse);
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+        chatService.revealBotMessage();
+      } catch (e) {
+        debugPrint('ChatInputBar: Error speaking response: $e');
+        chatService.revealBotMessage();
+      }
+    } else {
+      chatService.revealBotMessage();
+    }
+    
+    widget.onScrollToBottom();
   }
 
   @override
@@ -96,12 +243,20 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       widget.textController.text = speechService.lastWords;
                       _lastTranscription = speechService.lastWords;
+                      
+                      // Speculatively send the message (optimistic execution)
+                      debugPrint('ChatInputBar: Transcription complete, starting speculative request');
+                      _startSpeculativeRequest(speechService.lastWords);
                     });
                   }
 
                   // Clear the last transcription when listening starts
                   if (isListening && _lastTranscription.isNotEmpty) {
                     _lastTranscription = '';
+                    // Reset speculative request state when starting new recording
+                    _speculativeRequestActive = false;
+                    _speculativeResponse = null;
+                    _speculativeAudioReady = false;
                   }
 
                   return Row(
@@ -148,7 +303,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                       ),
                                       maxLines: null,
                                       textInputAction: TextInputAction.send,
-                                      onSubmitted: (_) => widget.onSendMessage(),
+                                      onSubmitted: (_) => _handleSendWithSpeculation(),
                                     );
                                   },
                                 ),
@@ -163,6 +318,11 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                     color: Colors.black54,
                                     onPressed: () {
                                       widget.textController.clear();
+                                      // Cancel any speculative request
+                                      _speculativeRequestActive = false;
+                                      _speculativeResponse = null;
+                                      _speculativeAudioReady = false;
+                                      _lastTranscription = '';
                                     },
                                     padding: const EdgeInsets.all(8),
                                     constraints: const BoxConstraints(),
@@ -187,7 +347,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                             height: 48,
                             child: (hasText && !isTranscribing)
                                 ? IconButton(
-                                    onPressed: widget.onSendMessage,
+                                    onPressed: _handleSendWithSpeculation,
                                     icon: Container(
                                       width: 48,
                                       height: 48,

@@ -290,6 +290,44 @@ class TtsService extends ChangeNotifier {
     return null;
   }
 
+  /// Pre-generate and cache audio without playing it (for speculative execution)
+  Future<void> preGenerateAudio(String text) async {
+    debugPrint('TTS Service: preGenerateAudio called with text length ${text.length}');
+    if (text.isEmpty) return;
+
+    // Check if we should speak this text
+    if (!_shouldSpeak(text)) {
+      debugPrint('TTS Service: Skipping audio generation for text that should not be spoken');
+      return;
+    }
+
+    // Clean up text
+    final cleanText = _stripEmojis(text);
+    
+    try {
+      // Only pre-generate for OpenAI TTS (system TTS can't be pre-generated)
+      if (_settingsModel.ttsProvider == TtsProvider.openai && _openAITts != null) {
+        final currentVoice = _settingsModel.openaiTtsVoice;
+        final cachedEntry = _getFromCache(cleanText);
+
+        // Only generate if not already cached
+        if (cachedEntry == null || cachedEntry.voice != currentVoice) {
+          debugPrint('TTS Service: Pre-generating audio for cache');
+          final audioData = await _openAITts!.generateAudio(cleanText);
+          
+          if (audioData != null) {
+            _addToCache(cleanText, audioData, currentVoice);
+            debugPrint('TTS Service: Audio pre-generated and cached');
+          }
+        } else {
+          debugPrint('TTS Service: Audio already in cache, skipping generation');
+        }
+      }
+    } catch (e) {
+      debugPrint('TTS Service: Error pre-generating audio: $e');
+    }
+  }
+
   Future<void> speak(String text) async {
     debugPrint('TTS Service: speak method called with text length ${text.length}');
     if (text.isEmpty) {

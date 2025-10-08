@@ -294,21 +294,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Clear all database data
       await DatabaseService.clearAllData();
       
-      // Clear current conversation and start fresh
+      // Get all necessary services and stores
       final chatService = context.read<ChatService>();
       final assessmentService = context.read<ComprehensiveAssessmentService>();
       final archiveStore = context.read<ConversationArchiveStore>();
-      
-      // Delete all archived conversations
-      await archiveStore.clearAll();
-      
-      await chatService.archiveAndStartNew();
-      await assessmentService.startNewSession();
-      
-      // Reload stores to reflect empty state
       final profileStore = context.read<StudentProfileStore>();
       final levelTracker = context.read<LanguageLevelTracker>();
       
+      // Clear all data from stores
+      await archiveStore.clearAll();
+      await profileStore.clearProfile();
+      await levelTracker.reset();
+      await assessmentService.reset();
+      
+      // Start fresh conversation and session
+      await chatService.archiveAndStartNew();
+      await assessmentService.startNewSession();
+      
+      // Re-initialize stores to reflect empty state
       await profileStore.initialize();
       await levelTracker.initialize();
       await archiveStore.initialize();

@@ -49,33 +49,10 @@ class ChatService extends ChangeNotifier {
   String get targetLanguage => _targetLanguage;
   bool get isThinking => _isThinking;
 
-  Future<String> sendMessage(String message, {bool hideUserMessage = false}) async {
-    // Create a user message
-    final userMessage = Message(content: message, source: MessageSource.user);
-
-    // Only add the user message to the conversation if not hidden
-    if (!hideUserMessage) {
-      _conversationStore.addMessage(userMessage);
-      notifyListeners();
-    }
-
+  /// Speculatively fetch a response without updating the UI
+  /// Returns a Future that resolves to the API response
+  Future<String> fetchResponseSpeculatively(String message) async {
     try {
-      _isThinking = true;
-
-      // Add thinking message to the conversation
-      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      _thinkingMessageId = 'thinking_$timestamp';
-
-      final thinkingMessage = Message(
-        content: '...',  // Simple content for thinking message
-        source: MessageSource.conversationBot,
-        isThinking: true,
-        id: _thinkingMessageId,
-      );
-
-      _conversationStore.addMessage(thinkingMessage);
-      notifyListeners();
-
       // Prepare context for the conversation
       String context = '';
       if (_contextManager.isInitialized) {
@@ -94,8 +71,71 @@ class ChatService extends ChangeNotifier {
           'Keep responses conversational and natural (2-3 sentences). '
           'If the student speaks in another language, gently encourage them to try in $_targetLanguage.';
 
-      // Call OpenAI API
+      // Call OpenAI API only (no UI updates)
       final assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);
+      
+      debugPrint('ChatService: Speculative response received (${assistantMessage.length} chars)');
+      
+      return assistantMessage;
+    } catch (e) {
+      debugPrint('Error in fetchResponseSpeculatively: $e');
+      rethrow;
+    }
+  }
+
+  Future<String> sendMessage(String message, {bool hideUserMessage = false, String? cachedResponse}) async {
+    // Create a user message
+    final userMessage = Message(content: message, source: MessageSource.user);
+
+    // Only add the user message to the conversation if not hidden
+    if (!hideUserMessage) {
+      _conversationStore.addMessage(userMessage);
+      notifyListeners();
+    }
+
+    try {
+      // Use cached response if available, otherwise call API
+      final String assistantMessage;
+      if (cachedResponse != null) {
+        debugPrint('ChatService: Using cached speculative response - skipping thinking indicator');
+        assistantMessage = cachedResponse;
+      } else {
+        _isThinking = true;
+
+        // Add thinking message to the conversation
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        _thinkingMessageId = 'thinking_$timestamp';
+
+        final thinkingMessage = Message(
+          content: '...',  // Simple content for thinking message
+          source: MessageSource.conversationBot,
+          isThinking: true,
+          id: _thinkingMessageId,
+        );
+
+        _conversationStore.addMessage(thinkingMessage);
+        notifyListeners();
+        // Prepare context for the conversation
+        String context = '';
+        if (_contextManager.isInitialized) {
+          context = await _contextManager.getContextForPrompt();
+        }
+
+        // Prepare the prompt
+        final prompt = context.isNotEmpty ? '$context\n\nUser: $message' : 'User: $message';
+
+        // System prompt for language learning
+        final systemPrompt = 'You are a $_targetLanguage language teacher having a natural conversation with your student. '
+            'YOU lead the conversation - ask questions, introduce topics, and guide the discussion. '
+            'Respond ONLY in $_targetLanguage at a level appropriate for the student. '
+            'Be proactive: share interesting facts, ask about their day, suggest activities, or discuss topics. '
+            'Act like a real teacher who is genuinely interested in engaging the student, not a passive assistant waiting for commands. '
+            'Keep responses conversational and natural (2-3 sentences). '
+            'If the student speaks in another language, gently encourage them to try in $_targetLanguage.';
+
+        // Call OpenAI API
+        assistantMessage = await _sendMessageToOpenAI(systemPrompt, prompt);
+      }
 
       // Store the response but keep thinking indicator for now
       // It will be removed when audio starts or immediately if audio is disabled
@@ -217,11 +257,13 @@ class ChatService extends ChangeNotifier {
   /// Reveal the bot's message (remove thinking indicator and show text)
   /// Call this when audio starts playing or immediately if audio is disabled
   void revealBotMessage() {
-    if (_isThinking && _lastResponse.isNotEmpty) {
-      // Remove thinking message
-      _conversationStore.removeThinking();
-      _isThinking = false;
-      _thinkingMessageId = '';
+    if (_lastResponse.isNotEmpty) {
+      // Remove thinking message if it exists
+      if (_isThinking) {
+        _conversationStore.removeThinking();
+        _isThinking = false;
+        _thinkingMessageId = '';
+      }
 
       // Add the actual response
       _conversationStore.addMessage(

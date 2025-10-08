@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/student_profile_store.dart';
 import '../models/language_level_tracker.dart';
-import '../models/conversation_archive.dart';
-import '../services/comprehensive_assessment_service.dart';
-import '../services/chat_service.dart';
 
 /// Consolidated view for student profile, language level, and assessment data
 class StudentProfileView extends StatefulWidget {
@@ -304,27 +301,6 @@ class _StudentProfileViewState extends State<StudentProfileView> {
             ),
 
             const SizedBox(height: 24),
-
-            // Reset button at bottom
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Center(
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirmReset(context),
-                  icon: const Icon(Icons.refresh, color: Colors.red),
-                  label: const Text(
-                    'Reset All Data',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
             // Assessment History Card
             Consumer<LanguageLevelTracker>(
               builder: (context, levelTracker, _) {
@@ -479,51 +455,5 @@ class _StudentProfileViewState extends State<StudentProfileView> {
     } else {
       return 'Just now';
     }
-  }
-
-  void _confirmReset(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset All Data'),
-        content: const Text(
-          'This will delete all student profile data and assessment history. Are you sure?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              // Reset all data
-              final profileStore = Provider.of<StudentProfileStore>(context, listen: false);
-              final levelTracker = Provider.of<LanguageLevelTracker>(context, listen: false);
-              final assessmentService = Provider.of<ComprehensiveAssessmentService>(context, listen: false);
-              final chatService = Provider.of<ChatService>(context, listen: false);
-              final archiveStore = Provider.of<ConversationArchiveStore>(context, listen: false);
-
-              await profileStore.clearProfile();
-              await levelTracker.reset();
-              await assessmentService.reset();
-              await archiveStore.clearAll();
-              
-              // Start fresh conversation and session
-              await chatService.archiveAndStartNew();
-              await assessmentService.startNewSession();
-
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('All data reset successfully')));
-                
-                // Navigate back to chat screen
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
   }
 }

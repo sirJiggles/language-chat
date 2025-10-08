@@ -135,7 +135,7 @@ class ChatBubble extends StatelessWidget {
                               child: Icon(
                                 Icons.help_outline,
                                 size: 20,
-                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.2),
                               ),
                             ),
                           // Audio button (if audio is enabled)
@@ -163,7 +163,7 @@ class ChatBubble extends StatelessWidget {
                                 size: 20,
                                 color: isThisMessagePlaying
                                     ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.2),
                               ),
                             ),
                         ],

@@ -248,17 +248,9 @@ class ChatScreenState extends State<ChatScreen> {
                       Navigator.of(
                         context,
                       ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
-                    } else if (value == 'new_chat') {
-                      _confirmNewChat(context);
                     }
                   },
                   itemBuilder: (BuildContext context) => [
-                    const PopupMenuItem<String>(
-                      value: 'new_chat',
-                      child: Row(
-                        children: [Icon(Icons.add_comment), SizedBox(width: 12), Text('New Chat')],
-                      ),
-                    ),
                     const PopupMenuItem<String>(
                       value: 'profile',
                       child: Row(
