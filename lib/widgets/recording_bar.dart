@@ -15,7 +15,6 @@ class RecordingBar extends StatefulWidget {
 }
 
 class _RecordingBarState extends State<RecordingBar> {
-
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -80,8 +79,8 @@ class _RecordingBarState extends State<RecordingBar> {
                               Container(
                                 width: 12,
                                 height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.error,
                                   shape: BoxShape.circle,
                                 ),
                               ),

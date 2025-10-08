@@ -7,7 +7,7 @@ class IconTiledBackground extends StatelessWidget {
   final double spacing;
   final double iconSize;
   final double iconOpacity;
-  
+
   static const List<String> iconPaths = [
     'assets/icons/001-ideas.png',
     'assets/icons/002-translate.png',
@@ -30,15 +30,11 @@ class IconTiledBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Stack(
       children: [
         // Background color
-        Positioned.fill(
-          child: Container(
-            color: isDark ? Colors.black : Colors.white,
-          ),
-        ),
+        Positioned.fill(child: Container(color: isDark ? Colors.black : Colors.white)),
         // Icon grid
         Positioned.fill(
           child: _IconGrid(
@@ -52,7 +48,7 @@ class IconTiledBackground extends StatelessWidget {
         // Semi-transparent overlay
         Positioned.fill(
           child: Container(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(overlayOpacity),
+            color: Theme.of(context).colorScheme.surface.withOpacity(overlayOpacity),
           ),
         ),
         // Content
@@ -84,29 +80,29 @@ class _IconGrid extends StatelessWidget {
         final random = Random(42); // Fixed seed for consistent pattern
         final columns = (constraints.maxWidth / spacing).ceil() + 2;
         final rows = (constraints.maxHeight / spacing).ceil() + 1;
-        
+
         final widgets = <Widget>[];
-        
+
         for (int row = 0; row < rows; row++) {
           // Offset every other row by half spacing (brick pattern)
           final isEvenRow = row % 2 == 0;
           final rowOffset = isEvenRow ? 0.0 : spacing / 2;
-          
+
           for (int col = 0; col < columns; col++) {
             // Pick random icon
             final iconPath = iconPaths[random.nextInt(iconPaths.length)];
-            
+
             // Calculate position with offset for brick pattern
             final x = col * spacing + rowOffset;
             final y = row * spacing;
-            
+
             widgets.add(
               Positioned(
                 left: x,
                 top: y,
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    isDarkMode ? Colors.white : Colors.black,
+                    Theme.of(context).colorScheme.onSurface,
                     BlendMode.srcIn,
                   ),
                   child: Opacity(
@@ -123,7 +119,7 @@ class _IconGrid extends StatelessWidget {
             );
           }
         }
-        
+
         return Stack(children: widgets);
       },
     );

@@ -67,185 +67,247 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Target Language Section
-          Text('Target Language', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedLanguage,
-            items: kLanguages.map((lang) => 
-              DropdownMenuItem(value: lang, child: Text(lang))
-            ).toList(),
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedLanguage = value);
-                final chat = context.read<ChatService>();
-                final tts = context.read<TtsService>();
-                chat.setTargetLanguage(value);
-                tts.setPreferredLanguage(value);
-              }
-            },
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+          // Language Settings Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.language, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text('Languages', style: Theme.of(context).textTheme.titleLarge),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  Text('Target Language', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLanguage,
+                    items: kLanguages.map((lang) => 
+                      DropdownMenuItem(value: lang, child: Text(lang))
+                    ).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedLanguage = value);
+                        final chat = context.read<ChatService>();
+                        final tts = context.read<TtsService>();
+                        chat.setTargetLanguage(value);
+                        tts.setPreferredLanguage(value);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                      ),
+                    ),
+                    dropdownColor: Theme.of(context).cardColor,
+                    icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  Text('Native Language', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedNativeLanguage,
+                    items: kLanguages.map((lang) => 
+                      DropdownMenuItem(value: lang, child: Text(lang))
+                    ).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedNativeLanguage = value);
+                        context.read<SettingsModel>().setNativeLanguage(value);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                      ),
+                    ),
+                    dropdownColor: Theme.of(context).cardColor,
+                    icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                  ),
+                ],
               ),
             ),
-            dropdownColor: Theme.of(context).cardColor,
-            icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           
-          // Native Language Section
-          Text('Native Language', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedNativeLanguage,
-            items: kLanguages.map((lang) => 
-              DropdownMenuItem(value: lang, child: Text(lang))
-            ).toList(),
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedNativeLanguage = value);
-                context.read<SettingsModel>().setNativeLanguage(value);
-              }
-            },
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+          // Appearance Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.palette, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
+                    ],
+                  ),
+                  SwitchListTile(
+                    title: const Text('Dark Mode'),
+                    subtitle: const Text('Use dark theme'),
+                    value: _isDarkMode,
+                    onChanged: (value) {
+                      setState(() => _isDarkMode = value);
+                      context.read<SettingsModel>().setDarkMode(value);
+                    },
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
               ),
             ),
-            dropdownColor: Theme.of(context).cardColor,
-            icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           
-          // Appearance Section
-          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Use dark theme'),
-            value: _isDarkMode,
-            onChanged: (value) {
-              setState(() => _isDarkMode = value);
-              context.read<SettingsModel>().setDarkMode(value);
-            },
-            activeColor: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 24),
-          
-          // Audio Section
-          Text('Audio', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Enable Audio'),
-            subtitle: const Text('Play bot responses with voice'),
-            value: _audioEnabled,
-            onChanged: (value) {
-              setState(() => _audioEnabled = value);
-              context.read<SettingsModel>().setAudioEnabled(value);
-            },
-            activeColor: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 24),
-          
-          // OpenAI Voice Section
-          Text('Voice', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedOpenAIVoice,
-              items: OpenAITtsService.availableVoices.map((voice) => 
-                DropdownMenuItem(
-                  value: voice['id'],
-                  child: Text('${voice['name']} - ${voice['description']}'),
-                )
-              ).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedOpenAIVoice = value);
-                  final tts = context.read<TtsService>();
-                  final settings = context.read<SettingsModel>();
-                  tts.setOpenAIVoice(value);
-                  settings.setOpenAITtsVoice(value);
-                }
-              },
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
-                ),
-              ),
-              dropdownColor: Theme.of(context).cardColor,
-              icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(height: 12),
-            Consumer<TtsService>(
-              builder: (context, tts, _) {
-                return OutlinedButton.icon(
-                  onPressed: tts.isSpeaking 
-                    ? null // Disable when speaking
-                    : () async {
-                        try {
-                          // Show loading indicator
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Loading voice preview...'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                          
-                          // Apply the voice and preview it
-                          tts.setOpenAIVoice(_selectedOpenAIVoice);
-                          await tts.previewVoice(_selectedOpenAIVoice, _selectedLanguage);
-                        } catch (e) {
-                          // Show error message
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error previewing voice: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+          // Audio Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text('Audio', style: Theme.of(context).textTheme.titleLarge),
+                    ],
+                  ),
+                  SwitchListTile(
+                    title: const Text('Enable Audio'),
+                    subtitle: const Text('Play bot responses with voice'),
+                    value: _audioEnabled,
+                    onChanged: (value) {
+                      setState(() => _audioEnabled = value);
+                      context.read<SettingsModel>().setAudioEnabled(value);
+                    },
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  
+                  // Voice settings - only show when audio is enabled
+                  if (_audioEnabled) ...[
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text('Voice', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedOpenAIVoice,
+                      items: OpenAITtsService.availableVoices.map((voice) => 
+                        DropdownMenuItem(
+                          value: voice['id'],
+                          child: Text('${voice['name']} - ${voice['description']}'),
+                        )
+                      ).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedOpenAIVoice = value);
+                          final tts = context.read<TtsService>();
+                          final settings = context.read<SettingsModel>();
+                          tts.setOpenAIVoice(value);
+                          settings.setOpenAITtsVoice(value);
                         }
                       },
-                  icon: tts.isSpeaking
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.volume_up),
-                  label: Text(tts.isSpeaking ? 'Playing...' : 'Preview OpenAI Voice'),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-          
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 16),
-          
-          // Danger Zone
-          Text(
-            'Danger Zone',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.red,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                        ),
+                      ),
+                      dropdownColor: Theme.of(context).cardColor,
+                      icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                    ),
+                    const SizedBox(height: 12),
+                    Consumer<TtsService>(
+                      builder: (context, tts, _) {
+                        return OutlinedButton.icon(
+                          onPressed: tts.isSpeaking 
+                            ? null 
+                            : () async {
+                                try {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Loading voice preview...'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                  
+                                  tts.setOpenAIVoice(_selectedOpenAIVoice);
+                                  await tts.previewVoice(_selectedOpenAIVoice, _selectedLanguage);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Error previewing voice: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                          icon: tts.isSpeaking
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.volume_up),
+                          label: Text(tts.isSpeaking ? 'Playing...' : 'Preview Voice'),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Warning: This will permanently delete all your data',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey,
-            ),
-          ),
           const SizedBox(height: 16),
           
-          // Reset All Data Button
-          OutlinedButton.icon(
-            onPressed: _confirmResetAllData,
-            icon: const Icon(Icons.delete_forever, color: Colors.red),
-            label: const Text('Reset All Data', style: TextStyle(color: Colors.red)),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.red),
+          // Danger Zone Card
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning, color: Theme.of(context).colorScheme.onErrorContainer),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Danger Zone',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Warning: This will permanently delete all your data',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  OutlinedButton.icon(
+                    onPressed: _confirmResetAllData,
+                    icon: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
+                    label: Text('Reset All Data', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

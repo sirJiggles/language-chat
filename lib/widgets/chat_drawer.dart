@@ -69,12 +69,12 @@ class ChatDrawer extends StatelessWidget {
                 final archives = archiveStore.archives;
 
                 if (archives.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Padding(
-                      padding: EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.all(24.0),
                       child: Text(
                         'No archived conversations yet',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -169,7 +169,7 @@ class _ArchiveListTile extends StatelessWidget {
       ),
       subtitle: Text(
         '$dateStr • ${archive.messages.length} messages',
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline, size: 20),

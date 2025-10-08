@@ -65,7 +65,7 @@ class ChatScreenState extends State<ChatScreen> {
 
     // Wait a moment to ensure the context manager is fully initialized
     await Future.delayed(const Duration(milliseconds: 800));
-    
+
     // Check if user has completed onboarding
     final onboardingCompleted = profileStore.getValue('onboarding_completed');
     if (onboardingCompleted == null && !_botGreetingSent) {
@@ -143,7 +143,7 @@ class ChatScreenState extends State<ChatScreen> {
   // Handle chat service updates
   void _handleChatServiceUpdate() {
     final chatService = Provider.of<ChatService>(context, listen: false);
-    
+
     // Reset greeting flag if conversation is empty (user cleared/reset data)
     if (chatService.conversationStore.messages.isEmpty && _botGreetingSent) {
       setState(() {
@@ -152,12 +152,13 @@ class ChatScreenState extends State<ChatScreen> {
       // Trigger initial greeting again
       _checkForInitialAssessment();
     }
-    
+
     // Auto-scroll to bottom when new messages arrive
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
   }
+
   Future<void> _sendTextMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -317,27 +318,31 @@ class ChatScreenState extends State<ChatScreen> {
 
                       final message = visibleMessages[index];
                       final chatService = Provider.of<ChatService>(context, listen: false);
-                      
+
                       // Get recent messages for context (last 5 messages before this one)
                       final startIndex = (index - 5).clamp(0, index);
                       final recentMessages = visibleMessages
                           .sublist(startIndex, index)
                           .map((m) => m.toString())
                           .toList();
-                      
+
                       return ChatBubble(
                         message: message.content,
                         isUser: message.isUser,
                         targetLanguage: chatService.targetLanguage,
                         recentMessages: recentMessages.isNotEmpty ? recentMessages : null,
-                        onClarificationRequested: message.isUser 
-                          ? null 
-                          : () {
-                              // Track clarification request for bot messages
-                              final assessmentService = Provider.of<ComprehensiveAssessmentService>(context, listen: false);
-                              final sessionId = assessmentService.currentSessionId;
-                              assessmentService.incrementClarificationCount(sessionId);
-                            },
+                        onClarificationRequested: message.isUser
+                            ? null
+                            : () {
+                                // Track clarification request for bot messages
+                                final assessmentService =
+                                    Provider.of<ComprehensiveAssessmentService>(
+                                      context,
+                                      listen: false,
+                                    );
+                                final sessionId = assessmentService.currentSessionId;
+                                assessmentService.incrementClarificationCount(sessionId);
+                              },
                       );
                     },
                   );

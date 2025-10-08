@@ -94,27 +94,28 @@ class ChatService extends ChangeNotifier {
     }
 
     try {
+      _isThinking = true;
+
+      // Add thinking message to the conversation
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      _thinkingMessageId = 'thinking_$timestamp';
+
+      final thinkingMessage = Message(
+        content: '...',  // Simple content for thinking message
+        source: MessageSource.conversationBot,
+        isThinking: true,
+        id: _thinkingMessageId,
+      );
+
+      _conversationStore.addMessage(thinkingMessage);
+      notifyListeners();
+
       // Use cached response if available, otherwise call API
       final String assistantMessage;
       if (cachedResponse != null) {
-        debugPrint('ChatService: Using cached speculative response - skipping thinking indicator');
+        debugPrint('ChatService: Using cached speculative response');
         assistantMessage = cachedResponse;
       } else {
-        _isThinking = true;
-
-        // Add thinking message to the conversation
-        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-        _thinkingMessageId = 'thinking_$timestamp';
-
-        final thinkingMessage = Message(
-          content: '...',  // Simple content for thinking message
-          source: MessageSource.conversationBot,
-          isThinking: true,
-          id: _thinkingMessageId,
-        );
-
-        _conversationStore.addMessage(thinkingMessage);
-        notifyListeners();
         // Prepare context for the conversation
         String context = '';
         if (_contextManager.isInitialized) {

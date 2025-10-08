@@ -85,7 +85,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
 
         // Use our local state for more reliable UI updates
         final bgColor = isListening
-            ? (_cancelRecording ? Colors.grey.shade400 : Theme.of(context).colorScheme.primary)
+            ? (_cancelRecording ? Theme.of(context).colorScheme.surfaceVariant : Theme.of(context).colorScheme.primary)
             : (_isSpeaking
                   ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.primary);
@@ -184,7 +184,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Theme.of(context).colorScheme.shadow.withOpacity(0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),

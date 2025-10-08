@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/student_profile_store.dart';
 import '../models/language_level_tracker.dart';
+import '../models/settings_model.dart';
 import '../services/comprehensive_assessment_service.dart';
+import '../services/chat_service.dart';
+import '../services/tts_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final String nativeLanguage;
@@ -75,6 +78,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return languageNames[code] ?? code.toUpperCase();
   }
 
+  String _getLanguageFullName(String code) {
+    const languageNames = {
+      'en': 'English',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'nl': 'Dutch',
+      'ru': 'Russian',
+      'ja': 'Japanese',
+      'zh': 'Chinese',
+      'ko': 'Korean',
+      'ar': 'Arabic',
+    };
+    return languageNames[code] ?? 'English';
+  }
+
   Future<void> _completeOnboarding() async {
     setState(() {
       _isLoading = true;
@@ -84,6 +105,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final profileStore = context.read<StudentProfileStore>();
       final levelTracker = context.read<LanguageLevelTracker>();
       final assessmentService = context.read<ComprehensiveAssessmentService>();
+      final settings = context.read<SettingsModel>();
+      final chatService = context.read<ChatService>();
+      final ttsService = context.read<TtsService>();
 
       // Save the self-assessed level
       final selectedLevel = _currentLevel;
@@ -94,6 +118,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await profileStore.setValue('self_assessment_date', DateTime.now().toIso8601String());
       await profileStore.setValue('native_language', widget.nativeLanguage);
       await profileStore.setValue('target_language', widget.targetLanguage);
+
+      // Update all services to sync with onboarding language choices
+      // Convert language codes to full names for settings
+      final nativeLanguageFullName = _getLanguageFullName(widget.nativeLanguage);
+      final targetLanguageFullName = _getLanguageFullName(widget.targetLanguage);
+      
+      await settings.setNativeLanguage(nativeLanguageFullName);
+      chatService.setTargetLanguage(targetLanguageFullName);
+      ttsService.setPreferredLanguage(targetLanguageFullName);
 
       // Set the initial level in the tracker
       await levelTracker.updateLevel(
@@ -112,9 +145,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } catch (e) {
       debugPrint('Error completing onboarding: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -133,25 +169,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.secondaryContainer,
-            ],
-          ),
-        ),
+        color: Theme.of(context).colorScheme.surface,
         child: SafeArea(
           child: Column(
             children: [
@@ -196,7 +220,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                         // Level display card
                         Card(
-                          elevation: 8,
+                          elevation: 2,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                           child: Padding(
                             padding: const EdgeInsets.all(24.0),
@@ -270,7 +294,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                       fontSize: isSelected ? 16 : 14,
                                       color: isSelected
-                                          ? themeColor
+                                          ? Theme.of(context).colorScheme.primary
                                           : Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   );
@@ -298,14 +322,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         )
-                      : const Text(
+                      : Text(
                           'Start Learning',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         ),
                 ),
               ),

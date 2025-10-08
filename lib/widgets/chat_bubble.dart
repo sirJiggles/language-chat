@@ -27,13 +27,25 @@ class ChatBubble extends StatelessWidget {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        margin: EdgeInsets.only(
+          top: 4.0,
+          bottom: 4.0,
+          left: isUser ? 60.0 : 0.0,
+          right: isUser ? 0.0 : 60.0,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
           color: isUser
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.secondary,
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Colors.white,
           borderRadius: BorderRadius.circular(20.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,14 +54,17 @@ class ChatBubble extends StatelessWidget {
             isUser
                 ? Text(
                     message,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontSize: 13,
+                    ),
                   )
                 : Consumer<WordDefinitionService>(
                     builder: (context, definitionService, _) {
                       return SelectableWordText(
                         text: message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSecondary,
+                        style: const TextStyle(
+                          color: Colors.black87,
                           fontSize: 13,
                         ),
                         definitionService: definitionService,
@@ -135,7 +150,7 @@ class ChatBubble extends StatelessWidget {
                               child: Icon(
                                 Icons.help_outline,
                                 size: 20,
-                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.2),
+                                color: Colors.black54,
                               ),
                             ),
                           // Audio button (if audio is enabled)
@@ -162,8 +177,8 @@ class ChatBubble extends StatelessWidget {
                                 isThisMessagePlaying ? Icons.stop : Icons.volume_up,
                                 size: 20,
                                 color: isThisMessagePlaying
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.2),
+                                    ? Colors.black87
+                                    : Colors.black54,
                               ),
                             ),
                         ],
@@ -187,11 +202,22 @@ class ThinkingBubble extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        margin: const EdgeInsets.only(
+          top: 4.0,
+          bottom: 4.0,
+          right: 60.0,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondary.withOpacity(0.9),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: SizedBox(
           height: 20, // Reduced height for the container
@@ -245,8 +271,8 @@ class _ThinkingDotsState extends State<_ThinkingDots> with SingleTickerProviderS
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: on
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onPrimary.withOpacity(0.3),
+                      ? Colors.black87
+                      : Colors.black26,
                   shape: BoxShape.circle,
                 ),
               );
