@@ -19,7 +19,7 @@ class SettingsModel extends ChangeNotifier {
   String _nativeLanguage = 'English'; // Default native language
   bool _audioEnabled = true; // Default audio on
   bool _isDarkMode = false; // Default light mode on
-  bool _conversationMode = false; // Default conversation mode off
+  bool _conversationMode = true; // Default conversation mode on
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
@@ -67,7 +67,7 @@ class SettingsModel extends ChangeNotifier {
     _isDarkMode = prefs.getBool(_darkModeKey) ?? false;
     
     // Load conversation mode
-    _conversationMode = prefs.getBool(_conversationModeKey) ?? false;
+    _conversationMode = prefs.getBool(_conversationModeKey) ?? true;
     
     notifyListeners();
   }
@@ -108,6 +108,13 @@ class SettingsModel extends ChangeNotifier {
   Future<void> setAudioEnabled(bool enabled) async {
     if (_audioEnabled != enabled) {
       _audioEnabled = enabled;
+      
+      // Conversation mode requires audio, so disable it when audio is disabled
+      if (!enabled && _conversationMode) {
+        _conversationMode = false;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_conversationModeKey, false);
+      }
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_audioEnabledKey, enabled);

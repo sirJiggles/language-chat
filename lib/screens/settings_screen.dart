@@ -218,12 +218,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   
                   SwitchListTile(
                     title: const Text('Conversation Mode'),
-                    subtitle: const Text('Hands-free continuous conversation with automatic silence detection'),
+                    subtitle: Text(
+                      _audioEnabled
+                          ? 'Hands-free continuous conversation with automatic silence detection'
+                          : 'Requires audio to be enabled',
+                    ),
                     value: _conversationMode,
-                    onChanged: (value) {
-                      setState(() => _conversationMode = value);
-                      context.read<SettingsModel>().setConversationMode(value);
-                    },
+                    onChanged: _audioEnabled
+                        ? (value) {
+                            setState(() => _conversationMode = value);
+                            context.read<SettingsModel>().setConversationMode(value);
+                          }
+                        : null,
                     activeColor: Theme.of(context).colorScheme.primary,
                     contentPadding: EdgeInsets.zero,
                   ),
