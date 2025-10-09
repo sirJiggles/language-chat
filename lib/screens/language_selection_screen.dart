@@ -1,5 +1,21 @@
 import 'package:flutter/material.dart';
 
+// List of supported language names (exported for use in settings)
+const List<String> kLanguages = [
+  'English',
+  'Spanish',
+  'French',
+  'German',
+  'Italian',
+  'Portuguese',
+  'Dutch',
+  'Russian',
+  'Japanese',
+  'Chinese',
+  'Korean',
+  'Arabic',
+];
+
 class LanguageSelectionScreen extends StatefulWidget {
   final Function(String nativeLanguage, String targetLanguage) onLanguagesSelected;
 
