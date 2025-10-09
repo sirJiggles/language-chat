@@ -142,7 +142,7 @@ class _ConversationModeBarState extends State<ConversationModeBar> {
     // Play audio if enabled and wait for it to finish
     if (settings.audioEnabled && response.isNotEmpty) {
       await ttsService.speak(response);
-      
+
       // Wait for TTS to completely finish before restarting recording
       while (ttsService.isSpeaking && mounted) {
         await Future.delayed(const Duration(milliseconds: 100));

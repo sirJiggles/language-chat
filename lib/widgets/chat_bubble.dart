@@ -5,6 +5,7 @@ import '../services/tts_service.dart';
 import '../services/word_definition_service.dart';
 import '../services/clarification_service.dart';
 import 'selectable_word_text.dart';
+import 'sound_wave_animation.dart';
 
 class ChatBubble extends StatelessWidget {
   final String message;
@@ -35,9 +36,7 @@ class ChatBubble extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
-          color: isUser
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Colors.white,
+          color: isUser ? Theme.of(context).colorScheme.primaryContainer : Colors.white,
           borderRadius: BorderRadius.circular(20.0),
           boxShadow: [
             BoxShadow(
@@ -63,10 +62,7 @@ class ChatBubble extends StatelessWidget {
                     builder: (context, definitionService, _) {
                       return SelectableWordText(
                         text: message,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 13,
-                        ),
+                        style: const TextStyle(color: Colors.black87, fontSize: 13),
                         definitionService: definitionService,
                       );
                     },
@@ -147,11 +143,7 @@ class ChatBubble extends StatelessWidget {
                                   ).showSnackBar(SnackBar(content: Text('Error: $e')));
                                 }
                               },
-                              child: Icon(
-                                Icons.help_outline,
-                                size: 20,
-                                color: Colors.black54,
-                              ),
+                              child: Icon(Icons.help_outline, size: 20, color: Colors.black54),
                             ),
                           // Audio button (if audio is enabled)
                           if (settings.audioEnabled)
@@ -173,13 +165,22 @@ class ChatBubble extends StatelessWidget {
                                       await ttsService.speak(messageText);
                                       debugPrint('ChatBubble: TTS speak method returned');
                                     },
-                              child: Icon(
-                                isThisMessagePlaying ? Icons.stop : Icons.volume_up,
-                                size: 20,
-                                color: isThisMessagePlaying
-                                    ? Colors.black87
-                                    : Colors.black54,
-                              ),
+                              child: isThisMessagePlaying
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: SoundWaveAnimation(
+                                        color: Colors.black87,
+                                        size: 20,
+                                        barCount: 4,
+                                        barWidth: 2,
+                                        barSpacing: 1.5,
+                                        minBarHeight: 3,
+                                        maxBarHeight: 12,
+                                        animationDuration: const Duration(milliseconds: 200),
+                                      ),
+                                    )
+                                  : Icon(Icons.volume_up, size: 20, color: Colors.black54),
                             ),
                         ],
                       ),
@@ -202,11 +203,7 @@ class ThinkingBubble extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(
-          top: 4.0,
-          bottom: 4.0,
-          right: 60.0,
-        ),
+        margin: const EdgeInsets.only(top: 4.0, bottom: 4.0, right: 60.0),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -270,9 +267,7 @@ class _ThinkingDotsState extends State<_ThinkingDots> with SingleTickerProviderS
                 height: 4,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
-                  color: on
-                      ? Colors.black87
-                      : Colors.black26,
+                  color: on ? Colors.black87 : Colors.black26,
                   shape: BoxShape.circle,
                 ),
               );
