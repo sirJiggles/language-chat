@@ -49,6 +49,10 @@
 	<string>We need access to your microphone for speech recognition</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We need speech recognition to understand what you're saying</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to take profile pictures</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to choose profile pictures</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

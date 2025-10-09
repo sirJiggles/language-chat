@@ -13,6 +13,7 @@ class SettingsModel extends ChangeNotifier {
   static const String _audioEnabledKey = 'audio_enabled';
   static const String _darkModeKey = 'dark_mode';
   static const String _conversationModeKey = 'conversation_mode';
+  static const String _profilePictureKey = 'profile_picture';
   
   TtsProvider _ttsProvider = TtsProvider.openai; // Default to OpenAI
   String _openaiTtsVoice = 'nova'; // Default OpenAI voice
@@ -20,6 +21,7 @@ class SettingsModel extends ChangeNotifier {
   bool _audioEnabled = true; // Default audio on
   bool _isDarkMode = false; // Default light mode on
   bool _conversationMode = true; // Default conversation mode on
+  String? _profilePicturePath; // Profile picture path
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
@@ -27,6 +29,7 @@ class SettingsModel extends ChangeNotifier {
   bool get audioEnabled => _audioEnabled;
   bool get isDarkMode => _isDarkMode;
   bool get conversationMode => _conversationMode;
+  String? get profilePicturePath => _profilePicturePath;
   
   SettingsModel() {
     _loadSettings();
@@ -68,6 +71,9 @@ class SettingsModel extends ChangeNotifier {
     
     // Load conversation mode
     _conversationMode = prefs.getBool(_conversationModeKey) ?? true;
+    
+    // Load profile picture path
+    _profilePicturePath = prefs.getString(_profilePictureKey);
     
     notifyListeners();
   }
@@ -143,5 +149,18 @@ class SettingsModel extends ChangeNotifier {
       
       notifyListeners();
     }
+  }
+  
+  Future<void> setProfilePicture(String? path) async {
+    _profilePicturePath = path;
+    
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString(_profilePictureKey, path);
+    } else {
+      await prefs.remove(_profilePictureKey);
+    }
+    
+    notifyListeners();
   }
 }

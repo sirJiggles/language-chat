@@ -1,6 +1,7 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:language_learning_chat/profile/student_profile_view.dart';
+import 'package:language_learning_chat/screens/student_profile_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/settings_model.dart';
@@ -293,15 +294,12 @@ class ChatScreenState extends State<ChatScreen> {
                       return PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert),
                         iconColor: Theme.of(context).colorScheme.primary,
+                        offset: const Offset(0, 50),
                         onSelected: (value) {
                           if (value == 'settings') {
                             Navigator.of(
                               context,
                             ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                          } else if (value == 'profile') {
-                            Navigator.of(
-                              context,
-                            ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
                           } else if (value == 'chats') {
                             Scaffold.of(scaffoldContext).openDrawer();
                           } else if (value == 'new_chat') {
@@ -326,16 +324,6 @@ class ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
                           const PopupMenuItem<String>(
-                            value: 'profile',
-                            child: Row(
-                              children: [
-                                Icon(Icons.person),
-                                SizedBox(width: 12),
-                                Text('My Profile'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
                             value: 'settings',
                             child: Row(
                               children: [
@@ -348,6 +336,53 @@ class ChatScreenState extends State<ChatScreen> {
                         ],
                       );
                     },
+                  ),
+                  // Profile avatar
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
+                      },
+                      child: Consumer2<SettingsModel, StudentProfileStore>(
+                        builder: (context, settings, profileStore, _) {
+                          final profilePicture = settings.profilePicturePath;
+                          
+                          if (profilePicture != null && File(profilePicture).existsSync()) {
+                            // Show uploaded profile picture
+                            return CircleAvatar(
+                              radius: 18,
+                              backgroundImage: FileImage(File(profilePicture)),
+                            );
+                          } else {
+                            // Get user's name initial - check multiple possible keys
+                            String initial = 'U';
+                            final name = profileStore.getValue('student_name') ?? 
+                                        profileStore.getValue('name') ?? 
+                                        profileStore.getValue('user_name');
+                            if (name != null && name.toString().isNotEmpty) {
+                              initial = name.toString()[0].toUpperCase();
+                            }
+                            
+                            // Show colored circle with initial as gravatar
+                            return CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              child: Text(
+                                initial,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
