@@ -361,6 +361,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                             ),
                           ),
                         ),
+                        const SizedBox(width: 5),
                         // Mic/Send button
                         ValueListenableBuilder<TextEditingValue>(
                           valueListenable: widget.textController,

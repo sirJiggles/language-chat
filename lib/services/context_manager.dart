@@ -45,6 +45,12 @@ class ContextManager extends ChangeNotifier {
   Future<String> getContextForPrompt() async {
     final contextBuilder = StringBuffer();
 
+    // Add current time of day context
+    final timeOfDayContext = _getTimeOfDayContext();
+    contextBuilder.writeln('=== CURRENT TIME ===');
+    contextBuilder.writeln(timeOfDayContext);
+    contextBuilder.writeln();
+
     // Check if we have basic information about the student
     bool hasName = false;
     String? studentName;
@@ -171,5 +177,32 @@ class ContextManager extends ChangeNotifier {
     }
 
     return contextBuilder.toString();
+  }
+
+  /// Get contextual information about the current time of day
+  String _getTimeOfDayContext() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    final dayOfWeek = _getDayOfWeek(now.weekday);
+    
+    String timeOfDay;
+    
+    if (hour >= 5 && hour < 12) {
+      timeOfDay = 'morning';
+    } else if (hour >= 12 && hour < 17) {
+      timeOfDay = 'afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      timeOfDay = 'evening';
+    } else {
+      timeOfDay = 'night';
+    }
+    
+    return 'It is currently $timeOfDay ($dayOfWeek, ${now.hour}:${now.minute.toString().padLeft(2, '0')}). '
+           'Be contextually appropriate - don\'t ask about daytime plans at night, or evening plans in the morning.';
+  }
+  
+  String _getDayOfWeek(int weekday) {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return days[weekday - 1];
   }
 }
