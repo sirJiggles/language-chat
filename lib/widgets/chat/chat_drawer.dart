@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/conversation_archive.dart';
+import '../../models/conversation_archive.dart';
 import 'chat_bubble.dart';
 
 class ChatDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
 
-  const ChatDrawer({
-    super.key,
-    required this.onNewChat,
-  });
+  const ChatDrawer({super.key, required this.onNewChat});
 
   @override
   Widget build(BuildContext context) {
@@ -106,9 +103,7 @@ class ChatDrawer extends StatelessWidget {
   void _viewArchive(BuildContext context, ArchivedConversation archive) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => _ArchiveDetailScreen(archive: archive),
-      ),
+      MaterialPageRoute(builder: (_) => _ArchiveDetailScreen(archive: archive)),
     );
   }
 
@@ -123,17 +118,14 @@ class ChatDrawer extends StatelessWidget {
         title: const Text('Delete Conversation'),
         content: Text('Delete "${archive.title}"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               store.deleteConversation(archive.id);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Conversation deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Conversation deleted')));
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
@@ -149,11 +141,7 @@ class _ArchiveListTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  const _ArchiveListTile({
-    required this.archive,
-    required this.onTap,
-    required this.onDelete,
-  });
+  const _ArchiveListTile({required this.archive, required this.onTap, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -207,18 +195,13 @@ class _ArchiveDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(archive.title),
-      ),
+      appBar: AppBar(title: Text(archive.title)),
       body: ListView.builder(
         padding: const EdgeInsets.all(16.0),
         itemCount: archive.messages.length,
         itemBuilder: (context, index) {
           final message = archive.messages[index];
-          return ChatBubble(
-            message: message.content,
-            isUser: message.isUser,
-          );
+          return ChatBubble(message: message.content, isUser: message.isUser);
         },
       ),
     );

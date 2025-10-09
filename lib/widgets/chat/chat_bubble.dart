@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/settings_model.dart';
-import '../services/tts_service.dart';
-import '../services/word_definition_service.dart';
-import '../services/clarification_service.dart';
+import '../../models/settings_model.dart';
+import '../../services/tts_service.dart';
+import '../../services/word_definition_service.dart';
+import '../../services/clarification_service.dart';
 import 'selectable_word_text.dart';
-import 'sound_wave_animation.dart';
+import '../sound_wave_animation.dart';
 
 class ChatBubble extends StatelessWidget {
   final String message;

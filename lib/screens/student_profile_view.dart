@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/profile/profile_picture_card.dart';
-import '../widgets/profile/language_level_card.dart';
-import '../widgets/profile/profile_data_card.dart';
+import '../widgets/widgets.dart';
 
 /// Consolidated view for student profile, language level, and assessment data
 class StudentProfileView extends StatelessWidget {

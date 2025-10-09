@@ -1,12 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/whisper_speech_service.dart';
-import '../services/chat_service.dart';
-import '../services/tts_service.dart';
-import '../models/settings_model.dart';
+import '../../services/whisper_speech_service.dart';
+import '../../services/chat_service.dart';
+import '../../services/tts_service.dart';
+import '../../models/settings_model.dart';
 import 'recording_bar.dart';
-import 'sound_wave_animation.dart';
+import '../sound_wave_animation.dart';
 
 class ChatInputBar extends StatefulWidget {
   final TextEditingController textController;
@@ -402,7 +402,7 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                   : Consumer<TtsService>(
                                       builder: (context, ttsService, _) {
                                         final isSpeaking = ttsService.isSpeaking;
-                                        
+
                                         return GestureDetector(
                                           onTap: _handleMicTap,
                                           child: Container(
@@ -428,20 +428,20 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                                     ),
                                                   )
                                                 : isSpeaking
-                                                    ? SoundWaveAnimation(
-                                                        color: Theme.of(context).colorScheme.onPrimary,
-                                                        size: 28,
-                                                        barCount: 5,
-                                                        barWidth: 2.5,
-                                                        barSpacing: 2,
-                                                        minBarHeight: 4,
-                                                        maxBarHeight: 16,
-                                                      )
-                                                    : Icon(
-                                                        Icons.mic,
-                                                        color: Theme.of(context).colorScheme.onPrimary,
-                                                        size: 24,
-                                                      ),
+                                                ? SoundWaveAnimation(
+                                                    color: Theme.of(context).colorScheme.onPrimary,
+                                                    size: 28,
+                                                    barCount: 5,
+                                                    barWidth: 2.5,
+                                                    barSpacing: 2,
+                                                    minBarHeight: 4,
+                                                    maxBarHeight: 16,
+                                                  )
+                                                : Icon(
+                                                    Icons.mic,
+                                                    color: Theme.of(context).colorScheme.onPrimary,
+                                                    size: 24,
+                                                  ),
                                           ),
                                         );
                                       },

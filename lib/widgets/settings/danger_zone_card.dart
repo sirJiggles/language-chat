@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/student_profile_store.dart';
+import '../../models/settings_model.dart';
 import '../../services/chat_service.dart';
 import '../../database/database_service.dart';
 
@@ -95,9 +96,13 @@ class DangerZoneCard extends StatelessWidget {
       // Clear all stores
       final profileStore = context.read<StudentProfileStore>();
       final chatService = context.read<ChatService>();
+      final settingsModel = context.read<SettingsModel>();
       
       await profileStore.clearProfile();
       chatService.clearConversation();
+      
+      // Remove profile picture
+      await settingsModel.setProfilePicture(null);
       
       // Reset database
       await DatabaseService.clearAllData();

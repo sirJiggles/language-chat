@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/settings_model.dart';
 import '../services/chat_service.dart';
-import '../widgets/settings/language_settings_card.dart';
-import '../widgets/settings/appearance_settings_card.dart';
-import '../widgets/settings/audio_settings_card.dart';
-import '../widgets/settings/danger_zone_card.dart';
+import '../widgets/widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

@@ -1,11 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/whisper_speech_service.dart';
-import '../services/chat_service.dart';
-import '../services/tts_service.dart';
-import '../models/settings_model.dart';
-import 'audio_waveform.dart';
+import '../../services/whisper_speech_service.dart';
+import '../../services/chat_service.dart';
+import '../../services/tts_service.dart';
+import '../../models/settings_model.dart';
+import '../audio_waveform.dart';
 
 class ConversationModeBar extends StatefulWidget {
   final VoidCallback onScrollToBottom;
