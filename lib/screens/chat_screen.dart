@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:language_learning_chat/profile/student_profile_view.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/settings_model.dart';
 import '../models/student_profile_store.dart';
 import '../services/chat_service.dart';
@@ -15,6 +16,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_mode_bar.dart';
 import '../widgets/thinking_dots.dart';
 import '../widgets/icon_tiled_background.dart';
+import '../widgets/sound_wave_animation.dart';
 import 'settings_screen.dart';
 import 'onboarding_screen.dart';
 import 'language_selection_screen.dart';
@@ -247,40 +249,105 @@ class ChatScreenState extends State<ChatScreen> {
               child: AppBar(
                 backgroundColor: Theme.of(context).colorScheme.surfaceBright.withOpacity(0.7),
                 elevation: 0,
-                leading: Builder(
-                  builder: (context) => IconButton(
-                    icon: const Icon(Icons.menu),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                  ),
+                leading: Consumer<TtsService>(
+                  builder: (context, ttsService, _) {
+                    final isBotSpeaking = ttsService.isSpeaking;
+                    return Container(
+                      padding: const EdgeInsets.all(0),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Robot SVG icon
+                          SvgPicture.asset(
+                            'assets/icons/robo.svg',
+                            colorFilter: ColorFilter.mode(
+                              Theme.of(context).colorScheme.primary,
+                              BlendMode.srcIn,
+                            ),
+                            width: 35,
+                            height: 35,
+                          ),
+                          // Wave animation overlay when bot is speaking
+                          if (isBotSpeaking)
+                            Positioned(
+                              bottom: 10,
+                              child: SoundWaveAnimation(
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                                barCount: 4,
+                                barWidth: 2,
+                                barSpacing: 1,
+                                minBarHeight: 3,
+                                maxBarHeight: 8,
+                                animationDuration: const Duration(milliseconds: 100),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 actions: [
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) {
-                      if (value == 'settings') {
-                        Navigator.of(
-                          context,
-                        ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                      } else if (value == 'profile') {
-                        Navigator.of(
-                          context,
-                        ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
-                      }
+                  Builder(
+                    builder: (BuildContext scaffoldContext) {
+                      return PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        iconColor: Theme.of(context).colorScheme.primary,
+                        onSelected: (value) {
+                          if (value == 'settings') {
+                            Navigator.of(
+                              context,
+                            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                          } else if (value == 'profile') {
+                            Navigator.of(
+                              context,
+                            ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
+                          } else if (value == 'chats') {
+                            Scaffold.of(scaffoldContext).openDrawer();
+                          } else if (value == 'new_chat') {
+                            _confirmNewChat(context);
+                          }
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          const PopupMenuItem<String>(
+                            value: 'new_chat',
+                            child: Row(
+                              children: [
+                                Icon(Icons.chat_bubble),
+                                SizedBox(width: 12),
+                                Text('New Chat'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'chats',
+                            child: Row(
+                              children: [Icon(Icons.history), SizedBox(width: 12), Text('Chats')],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'profile',
+                            child: Row(
+                              children: [
+                                Icon(Icons.person),
+                                SizedBox(width: 12),
+                                Text('My Profile'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'settings',
+                            child: Row(
+                              children: [
+                                Icon(Icons.settings),
+                                SizedBox(width: 12),
+                                Text('Settings'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
                     },
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem<String>(
-                        value: 'profile',
-                        child: Row(
-                          children: [Icon(Icons.person), SizedBox(width: 12), Text('My Profile')],
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'settings',
-                        child: Row(
-                          children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -414,9 +481,7 @@ class ChatScreenState extends State<ChatScreen> {
                 builder: (context, settings, _) {
                   if (settings.conversationMode) {
                     // Conversation mode - large mic button with continuous recording
-                    return ConversationModeBar(
-                      onScrollToBottom: _scrollToBottom,
-                    );
+                    return ConversationModeBar(onScrollToBottom: _scrollToBottom);
                   } else {
                     // Normal mode - text input with mic button
                     return Column(
