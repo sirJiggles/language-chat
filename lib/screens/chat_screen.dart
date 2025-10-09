@@ -21,6 +21,7 @@ class ChatScreenState extends State<ChatScreen> {
   bool _botGreetingSent = false;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
@@ -213,10 +214,11 @@ class ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       extendBodyBehindAppBar: true,
       appBar: ChatAppBar(
         onNewChat: () => _confirmNewChat(context),
-        onOpenDrawer: () => Scaffold.of(context).openDrawer(),
+        onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
       ),
       drawer: ChatDrawer(onNewChat: () => _confirmNewChat(context)),
       body: IconTiledBackground(

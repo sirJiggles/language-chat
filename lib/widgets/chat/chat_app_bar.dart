@@ -14,11 +14,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onNewChat;
   final VoidCallback onOpenDrawer;
 
-  const ChatAppBar({
-    super.key,
-    required this.onNewChat,
-    required this.onOpenDrawer,
-  });
+  const ChatAppBar({super.key, required this.onNewChat, required this.onOpenDrawer});
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -51,10 +47,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               elevation: 0,
               leading: _RobotIcon(),
               actions: [
-                _MenuButton(
-                  onNewChat: onNewChat,
-                  onOpenDrawer: onOpenDrawer,
-                ),
+                _MenuButton(onNewChat: onNewChat, onOpenDrawer: onOpenDrawer),
                 _ProfileAvatar(),
               ],
             ),
@@ -113,56 +106,43 @@ class _MenuButton extends StatelessWidget {
   final VoidCallback onNewChat;
   final VoidCallback onOpenDrawer;
 
-  const _MenuButton({
-    required this.onNewChat,
-    required this.onOpenDrawer,
-  });
+  const _MenuButton({required this.onNewChat, required this.onOpenDrawer});
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      iconColor: Theme.of(context).colorScheme.primary,
-      offset: const Offset(0, 50),
-      onSelected: (value) {
-        if (value == 'settings') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SettingsScreen()),
-          );
-        } else if (value == 'chats') {
-          onOpenDrawer();
-        } else if (value == 'new_chat') {
-          onNewChat();
-        }
+    return Builder(
+      builder: (BuildContext scaffoldContext) {
+        return PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          iconColor: Theme.of(context).colorScheme.primary,
+          offset: const Offset(0, 50),
+          onSelected: (value) {
+            if (value == 'settings') {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            } else if (value == 'chats') {
+              onOpenDrawer();
+            } else if (value == 'new_chat') {
+              onNewChat();
+            }
+          },
+          itemBuilder: (BuildContext context) => [
+            const PopupMenuItem<String>(
+              value: 'new_chat',
+              child: Row(
+                children: [Icon(Icons.chat_bubble), SizedBox(width: 12), Text('New Chat')],
+              ),
+            ),
+            const PopupMenuItem<String>(
+              value: 'chats',
+              child: Row(children: [Icon(Icons.history), SizedBox(width: 12), Text('Chats')]),
+            ),
+            const PopupMenuItem<String>(
+              value: 'settings',
+              child: Row(children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')]),
+            ),
+          ],
+        );
       },
-      itemBuilder: (BuildContext context) => [
-        const PopupMenuItem<String>(
-          value: 'new_chat',
-          child: Row(
-            children: [
-              Icon(Icons.chat_bubble),
-              SizedBox(width: 12),
-              Text('New Chat'),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'chats',
-          child: Row(
-            children: [Icon(Icons.history), SizedBox(width: 12), Text('Chats')],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'settings',
-          child: Row(
-            children: [
-              Icon(Icons.settings),
-              SizedBox(width: 12),
-              Text('Settings'),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -174,9 +154,7 @@ class _ProfileAvatar extends StatelessWidget {
       padding: const EdgeInsets.only(right: 8.0),
       child: GestureDetector(
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const StudentProfileView()),
-          );
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
         },
         child: Consumer2<SettingsModel, StudentProfileStore>(
           builder: (context, settings, profileStore, _) {
@@ -184,14 +162,12 @@ class _ProfileAvatar extends StatelessWidget {
 
             if (profilePicture != null && File(profilePicture).existsSync()) {
               // Show uploaded profile picture
-              return CircleAvatar(
-                radius: 18,
-                backgroundImage: FileImage(File(profilePicture)),
-              );
+              return CircleAvatar(radius: 18, backgroundImage: FileImage(File(profilePicture)));
             } else {
               // Get user's name initial - check multiple possible keys
               String initial = 'U';
-              final name = profileStore.getValue('student_name') ??
+              final name =
+                  profileStore.getValue('student_name') ??
                   profileStore.getValue('name') ??
                   profileStore.getValue('user_name');
               if (name != null && name.toString().isNotEmpty) {
