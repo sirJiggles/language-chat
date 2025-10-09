@@ -12,6 +12,7 @@ import '../services/comprehensive_assessment_service.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_drawer.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/conversation_mode_bar.dart';
 import '../widgets/thinking_dots.dart';
 import '../widgets/icon_tiled_background.dart';
 import 'settings_screen.dart';
@@ -244,44 +245,44 @@ class ChatScreenState extends State<ChatScreen> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: AppBar(
-                backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                backgroundColor: Theme.of(context).colorScheme.surfaceBright.withOpacity(0.7),
                 elevation: 0,
-              leading: Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
+                leading: Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
                 ),
-              ),
-              actions: [
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'settings') {
-                      Navigator.of(
-                        context,
-                      ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                    } else if (value == 'profile') {
-                      Navigator.of(
-                        context,
-                      ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => [
-                    const PopupMenuItem<String>(
-                      value: 'profile',
-                      child: Row(
-                        children: [Icon(Icons.person), SizedBox(width: 12), Text('My Profile')],
+                actions: [
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) {
+                      if (value == 'settings') {
+                        Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      } else if (value == 'profile') {
+                        Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute(builder: (_) => const StudentProfileView()));
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem<String>(
+                        value: 'profile',
+                        child: Row(
+                          children: [Icon(Icons.person), SizedBox(width: 12), Text('My Profile')],
+                        ),
                       ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'settings',
-                      child: Row(
-                        children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
+                      const PopupMenuItem<String>(
+                        value: 'settings',
+                        child: Row(
+                          children: [Icon(Icons.settings), SizedBox(width: 12), Text('Settings')],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -296,8 +297,8 @@ class ChatScreenState extends State<ChatScreen> {
         child: Stack(
           children: [
             // Main chat content (full screen)
-            Consumer<ChatService>(
-              builder: (context, chatService, _) {
+            Consumer2<ChatService, SettingsModel>(
+              builder: (context, chatService, settings, _) {
                 final messages = chatService.conversationStore.messages;
 
                 if (messages.isNotEmpty) {
@@ -318,13 +319,16 @@ class ChatScreenState extends State<ChatScreen> {
                     _scrollToBottom();
                   });
 
+                  // Adjust bottom padding based on conversation mode
+                  final bottomPadding = settings.conversationMode ? 180.0 : 95.0;
+
                   return ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.only(
+                    padding: EdgeInsets.only(
                       top: kToolbarHeight + 40,
                       left: 10.0,
                       right: 10.0,
-                      bottom: 95.0, // Extra padding for frosted glass bottom bar
+                      bottom: bottomPadding,
                     ),
                     itemCount: isThinking ? visibleMessages.length + 1 : visibleMessages.length,
                     itemBuilder: (context, index) {
@@ -406,16 +410,27 @@ class ChatScreenState extends State<ChatScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // WhatsApp-style bottom input area with frosted glass
-                  ChatInputBar(
-                    textController: _textController,
-                    onSendMessage: _sendTextMessage,
-                    onScrollToBottom: _scrollToBottom,
-                  ),
-                ],
+              child: Consumer<SettingsModel>(
+                builder: (context, settings, _) {
+                  if (settings.conversationMode) {
+                    // Conversation mode - large mic button with continuous recording
+                    return ConversationModeBar(
+                      onScrollToBottom: _scrollToBottom,
+                    );
+                  } else {
+                    // Normal mode - text input with mic button
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ChatInputBar(
+                          textController: _textController,
+                          onSendMessage: _sendTextMessage,
+                          onScrollToBottom: _scrollToBottom,
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
             ),
           ],

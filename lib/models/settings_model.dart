@@ -12,18 +12,21 @@ class SettingsModel extends ChangeNotifier {
   static const String _nativeLanguageKey = 'native_language';
   static const String _audioEnabledKey = 'audio_enabled';
   static const String _darkModeKey = 'dark_mode';
+  static const String _conversationModeKey = 'conversation_mode';
   
   TtsProvider _ttsProvider = TtsProvider.openai; // Default to OpenAI
   String _openaiTtsVoice = 'nova'; // Default OpenAI voice
   String _nativeLanguage = 'English'; // Default native language
   bool _audioEnabled = true; // Default audio on
   bool _isDarkMode = false; // Default light mode on
+  bool _conversationMode = false; // Default conversation mode off
   
   TtsProvider get ttsProvider => _ttsProvider;
   String get openaiTtsVoice => _openaiTtsVoice;
   String get nativeLanguage => _nativeLanguage;
   bool get audioEnabled => _audioEnabled;
   bool get isDarkMode => _isDarkMode;
+  bool get conversationMode => _conversationMode;
   
   SettingsModel() {
     _loadSettings();
@@ -62,6 +65,9 @@ class SettingsModel extends ChangeNotifier {
     
     // Load dark mode
     _isDarkMode = prefs.getBool(_darkModeKey) ?? false;
+    
+    // Load conversation mode
+    _conversationMode = prefs.getBool(_conversationModeKey) ?? false;
     
     notifyListeners();
   }
@@ -116,6 +122,17 @@ class SettingsModel extends ChangeNotifier {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_darkModeKey, enabled);
+      
+      notifyListeners();
+    }
+  }
+  
+  Future<void> setConversationMode(bool enabled) async {
+    if (_conversationMode != enabled) {
+      _conversationMode = enabled;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_conversationModeKey, enabled);
       
       notifyListeners();
     }

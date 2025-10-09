@@ -6,6 +6,7 @@ import '../services/chat_service.dart';
 import '../services/tts_service.dart';
 import '../models/settings_model.dart';
 import 'recording_bar.dart';
+import 'sound_wave_animation.dart';
 
 class ChatInputBar extends StatefulWidget {
   final TextEditingController textController;
@@ -398,36 +399,52 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
                                       ),
                                       padding: EdgeInsets.zero,
                                     )
-                                  : GestureDetector(
-                                      onTap: _handleMicTap,
-                                      child: Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.primary,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.2),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: isTranscribing
-                                            ? Padding(
-                                                padding: const EdgeInsets.all(12.0),
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
+                                  : Consumer<TtsService>(
+                                      builder: (context, ttsService, _) {
+                                        final isSpeaking = ttsService.isSpeaking;
+                                        
+                                        return GestureDetector(
+                                          onTap: _handleMicTap,
+                                          child: Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.2),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 4),
                                                 ),
-                                              )
-                                            : Icon(
-                                                Icons.mic,
-                                                color: Theme.of(context).colorScheme.onPrimary,
-                                                size: 24,
-                                              ),
-                                      ),
+                                              ],
+                                            ),
+                                            child: isTranscribing
+                                                ? Padding(
+                                                    padding: const EdgeInsets.all(12.0),
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )
+                                                : isSpeaking
+                                                    ? SoundWaveAnimation(
+                                                        color: Theme.of(context).colorScheme.onPrimary,
+                                                        size: 28,
+                                                        barCount: 5,
+                                                        barWidth: 2.5,
+                                                        barSpacing: 2,
+                                                        minBarHeight: 4,
+                                                        maxBarHeight: 16,
+                                                      )
+                                                    : Icon(
+                                                        Icons.mic,
+                                                        color: Theme.of(context).colorScheme.onPrimary,
+                                                        size: 24,
+                                                      ),
+                                          ),
+                                        );
+                                      },
                                     ),
                             );
                           },

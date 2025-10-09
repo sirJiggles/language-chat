@@ -20,9 +20,22 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Piper-supported common languages (names map via TtsService)
   static const List<String> kLanguages = [
-    'English', 'German', 'Spanish', 'French', 'Italian', 'Portuguese',
-    'Dutch', 'Swedish', 'Norwegian', 'Danish', 'Polish', 'Russian',
-    'Turkish', 'Japanese', 'Chinese', 'Korean'
+    'English',
+    'German',
+    'Spanish',
+    'French',
+    'Italian',
+    'Portuguese',
+    'Dutch',
+    'Swedish',
+    'Norwegian',
+    'Danish',
+    'Polish',
+    'Russian',
+    'Turkish',
+    'Japanese',
+    'Chinese',
+    'Korean',
   ];
 
   String _selectedLanguage = 'German';
@@ -30,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedNativeLanguage = 'English';
   bool _audioEnabled = true;
   bool _isDarkMode = true;
+  bool _conversationMode = false;
 
   @override
   void initState() {
@@ -54,6 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _selectedOpenAIVoice = settings.openaiTtsVoice;
         _selectedNativeLanguage = settings.nativeLanguage;
         _isDarkMode = settings.isDarkMode;
+        _conversationMode = settings.conversationMode;
       });
     }
   }
@@ -61,9 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -82,14 +95,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Text('Target Language', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: _selectedLanguage,
-                    items: kLanguages.map((lang) => 
-                      DropdownMenuItem(value: lang, child: Text(lang))
-                    ).toList(),
+                    items: kLanguages
+                        .map((lang) => DropdownMenuItem(value: lang, child: Text(lang)))
+                        .toList(),
                     onChanged: (value) {
                       if (value != null) {
                         setState(() => _selectedLanguage = value);
@@ -102,21 +115,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2.0,
+                        ),
                       ),
                     ),
                     dropdownColor: Theme.of(context).cardColor,
                     icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Text('Native Language', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: _selectedNativeLanguage,
-                    items: kLanguages.map((lang) => 
-                      DropdownMenuItem(value: lang, child: Text(lang))
-                    ).toList(),
+                    items: kLanguages
+                        .map((lang) => DropdownMenuItem(value: lang, child: Text(lang)))
+                        .toList(),
                     onChanged: (value) {
                       if (value != null) {
                         setState(() => _selectedNativeLanguage = value);
@@ -126,7 +142,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2.0,
+                        ),
                       ),
                     ),
                     dropdownColor: Theme.of(context).cardColor,
@@ -137,7 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Appearance Card
           Card(
             child: Padding(
@@ -168,7 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Audio Card
           Card(
             child: Padding(
@@ -195,6 +214,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                   
+                  const Divider(),
+                  
+                  SwitchListTile(
+                    title: const Text('Conversation Mode'),
+                    subtitle: const Text('Hands-free continuous conversation with automatic silence detection'),
+                    value: _conversationMode,
+                    onChanged: (value) {
+                      setState(() => _conversationMode = value);
+                      context.read<SettingsModel>().setConversationMode(value);
+                    },
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
                   // Voice settings - only show when audio is enabled
                   if (_audioEnabled) ...[
                     const Divider(),
@@ -203,12 +236,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: _selectedOpenAIVoice,
-                      items: OpenAITtsService.availableVoices.map((voice) => 
-                        DropdownMenuItem(
-                          value: voice['id'],
-                          child: Text('${voice['name']} - ${voice['description']}'),
-                        )
-                      ).toList(),
+                      items: OpenAITtsService.availableVoices
+                          .map(
+                            (voice) => DropdownMenuItem(
+                              value: voice['id'],
+                              child: Text('${voice['name']} - ${voice['description']}'),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) {
                         if (value != null) {
                           setState(() => _selectedOpenAIVoice = value);
@@ -221,43 +256,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2.0,
+                          ),
                         ),
                       ),
                       dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Consumer<TtsService>(
                       builder: (context, tts, _) {
                         return OutlinedButton.icon(
-                          onPressed: tts.isSpeaking 
-                            ? null 
-                            : () async {
-                                try {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Loading voice preview...'),
-                                      duration: Duration(seconds: 1),
-                                    ),
-                                  );
-                                  
-                                  tts.setOpenAIVoice(_selectedOpenAIVoice);
-                                  await tts.previewVoice(_selectedOpenAIVoice, _selectedLanguage);
-                                } catch (e) {
-                                  if (context.mounted) {
+                          onPressed: tts.isSpeaking
+                              ? null
+                              : () async {
+                                  try {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error previewing voice: $e'),
-                                        backgroundColor: Colors.red,
+                                      const SnackBar(
+                                        content: Text('Loading voice preview...'),
+                                        duration: Duration(seconds: 1),
                                       ),
                                     );
+
+                                    tts.setOpenAIVoice(_selectedOpenAIVoice);
+                                    await tts.previewVoice(_selectedOpenAIVoice, _selectedLanguage);
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error previewing voice: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
                                   }
-                                }
-                              },
+                                },
                           icon: tts.isSpeaking
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.volume_up),
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.volume_up),
                           label: Text(tts.isSpeaking ? 'Playing...' : 'Preview Voice'),
                         );
                       },
@@ -268,7 +313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Danger Zone Card
           Card(
             color: Theme.of(context).colorScheme.errorContainer,
@@ -297,13 +342,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   OutlinedButton.icon(
                     onPressed: _confirmResetAllData,
-                    icon: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
-                    label: Text('Reset All Data', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    icon: Icon(
+                      Icons.delete_forever,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    label: Text(
+                      'Reset All Data',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Theme.of(context).colorScheme.error),
+                      side: BorderSide(color: Theme.of(context).colorScheme.onErrorContainer),
                     ),
                   ),
                 ],
@@ -314,7 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-  
+
   void _confirmResetAllData() {
     showDialog(
       context: context,
@@ -329,10 +380,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'This action cannot be undone!',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -344,40 +392,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-  
+
   Future<void> _resetAllData() async {
     try {
       // Show loading
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Deleting all data...')),
-      );
-      
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Deleting all data...')));
+
       // Clear all database data
       await DatabaseService.clearAllData();
-      
+
       // Get all necessary services and stores
       final chatService = context.read<ChatService>();
       final assessmentService = context.read<ComprehensiveAssessmentService>();
       final archiveStore = context.read<ConversationArchiveStore>();
       final profileStore = context.read<StudentProfileStore>();
       final levelTracker = context.read<LanguageLevelTracker>();
-      
+
       // Clear all data from stores
       await archiveStore.clearAll();
       await profileStore.clearProfile();
       await levelTracker.reset();
       await assessmentService.reset();
-      
+
       // Start fresh conversation and session
       await chatService.archiveAndStartNew();
       await assessmentService.startNewSession();
-      
+
       // Re-initialize stores to reflect empty state
       await profileStore.initialize();
       await levelTracker.initialize();
       await archiveStore.initialize();
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -385,18 +433,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       // Go back to chat screen with fresh session
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error resetting data: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error resetting data: $e'), backgroundColor: Colors.red),
       );
     }
   }
-
 }
